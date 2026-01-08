@@ -37,7 +37,9 @@ export const createNew = async (name) => {
 
 export const getProjectById = async (projectId) => {
   const response = await fetch(`http://localhost:5000/api/projects/${projectId}`, {
-    headers: {
+    method: "GET",
+    headers: { 
+      "Content-Type": "application/json",
       Authorization: `Bearer ${localStorage.getItem("token")}`
     }
   });
@@ -47,16 +49,25 @@ export const getProjectById = async (projectId) => {
   return result.data;
 };
 
-export const updateLayout = async (projectId, layoutData) => {
-  const response = await fetch(`http://localhost:5000/api/projects/${projectId}/layout`, {
-    method: "PATCH",
+
+export async function updateProjectName(projectId, name, token) {
+  if (!name || typeof name !== 'string') {
+    throw new Error('Project name must be a non-empty string');
+  }
+
+  const response = await fetch(`/api/projects/${projectId}/name`, {
+    method: 'POST',
     headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("token")}`
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
     },
-    body: JSON.stringify({ layoutData })
+    body: JSON.stringify({ name: name.trim() }),
   });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.message);
-  return result.data;
-};
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to update project name');
+  }
+
+  return response.json(); // { message, data }
+}

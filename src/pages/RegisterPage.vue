@@ -25,7 +25,6 @@
         <v-btn
           type="submit"
           block
-          :loading="mutation.isLoading"
           class="mt-4"
           color="primary"
         >

@@ -25,19 +25,26 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuery, useMutation, useQueryClient } from 'vue-query'
 import { fetchAll, createNew } from '../services/projectsService'
 import ProjectPreview from '../components/ProjectPreview.vue'
 
-const router = useRouter();
-const queryClient = useQueryClient();
+const router = useRouter()
+const queryClient = useQueryClient()
 
-// Fetch projects
-const { data, isLoading, isFetching } = useQuery('projects', fetchAll);
-const projects = data?._object?.data?.projects || [];
-alert(JSON.stringify(data?._object?.data?.projects || []));
-// Mutation to add new project
+const { data: projectsRef, isLoading, isFetching } = useQuery(
+  'projects',
+  fetchAll,
+  {
+    select: (res) => {
+      return res?.projects || [];
+    }
+  }
+)
+const projects = computed(() => projectsRef.value || [])
+
 const addNewProjectMutation = useMutation(() => createNew('Untitled project'), {
   onSuccess: (createdProject) => {
     router.push(`/project/${createdProject._id}`);
@@ -46,7 +53,7 @@ const addNewProjectMutation = useMutation(() => createNew('Untitled project'), {
   onError: (error) => {
     alert('Error creating template: ' + error.message);
   },
-})
+});
 
 // Handler
 const handleAddNewProject = () => {
