@@ -1,4 +1,3 @@
-$color1:#2b3943;
 h2 {
   margin-bottom: 12px;
 }
@@ -32,13 +31,13 @@ canvas{
 #props-menu{
   position:absolute;
   top:8vh;
-  left: 1vh;
+  right: 40px;
   height: 90vh;
-  width: 220px;
+  width:0;
   opacity:0;
   z-index: 3;
   color:white;
-  background-color: $color1;
+  background-color: #2b3943;
   border-radius: 10px;
   transition: opacity 0.25s;
   padding: 20px;
@@ -89,3 +88,8 @@ canvas{
   border-radius: 2px;
 }
 .right-handle::before { transform: rotate(90deg); }
+
+#edit-project-container{
+  margin-left: 56px;
+  max-width: calc(100% - 56px);
+}

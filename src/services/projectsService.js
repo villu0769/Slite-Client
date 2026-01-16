@@ -1,73 +1,78 @@
 
 export const fetchAll = async () => {
-    const response = await fetch("http://localhost:5000/api/projects/", {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-        }
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-        throw new Error(result.message);
+  const response = await fetch("http://localhost:5000/api/projects/", {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
     }
+  });
 
-    return result.data;
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.message);
+  }
+
+  return result.data;
 };
 export const createNew = async (name) => {
-    const response = await fetch("http://localhost:5000/api/projects/", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({ name }),
-    });
+  const response = await fetch("http://localhost:5000/api/projects/", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+    body: JSON.stringify({ name }),
+  });
 
-    const result = await response.json();
+  const result = await response.json();
 
-    if (!response.ok) {
-        throw new Error(result.message);
-    }
+  if (!response.ok) {
+    throw new Error(result.message);
+  }
 
-    return result.data; 
+  return result.data;
 };
 
 export const getProjectById = async (projectId) => {
   const response = await fetch(`http://localhost:5000/api/projects/${projectId}`, {
     method: "GET",
-    headers: { 
+    headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${localStorage.getItem("token")}`
     }
   });
   const result = await response.json();
 
-  if (!response.ok) throw new Error(result.message);
+  if (!response.ok) {
+    throw new Error(result.message);
+  }
+
   return result.data;
 };
 
 
-export async function updateProjectName(projectId, name, token) {
+export async function updateProjectName(projectId, name) {
   if (!name || typeof name !== 'string') {
     throw new Error('Project name must be a non-empty string');
   }
 
-  const response = await fetch(`/api/projects/${projectId}/name`, {
+  const response = await fetch(`http://localhost:5000/api/projects/${projectId}/name`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
+      Authorization: `Bearer ${localStorage.getItem("token")}`
     },
     body: JSON.stringify({ name: name.trim() }),
   });
 
+
+  const result = await response.json();
+
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to update project name');
+    throw new Error(result.message);
   }
 
-  return response.json(); // { message, data }
+  return result.data;
 }

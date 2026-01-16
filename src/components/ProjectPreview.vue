@@ -22,5 +22,5 @@ const handleOnClick = (id) => {
 </script>
 
 <style scoped>
-@import './projectStyle.scss';
+@import './projectStyle.css';
 </style>

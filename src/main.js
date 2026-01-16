@@ -2,8 +2,8 @@ import { createApp } from 'vue';
 import App from './App.vue';
 import router from './router';
 import { VueQueryPlugin, QueryClient } from 'vue-query';
+import './assets/theme.css';
 
-// Vuetify 3 setup
 import 'vuetify/styles';
 import { createVuetify } from 'vuetify';
 import * as components from 'vuetify/components';

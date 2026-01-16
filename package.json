@@ -10,8 +10,9 @@
   },
   "dependencies": {
     "konva": "^9.3.22",
-    "sass": "^1.90.0",
+    "lodash.debounce": "^4.0.8",
     "three": "^0.172.0",
+    "uuid": "^13.0.0",
     "vue": "^3.5.18",
     "vue-i18n": "^10.0.8",
     "vue-query": "^1.26.0",

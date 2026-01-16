@@ -1,19 +1,21 @@
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as THREE from 'three';
 
-export async function loadLayout(layoutData, manager, maxHeight, scene, perspectiveCamera, controls, planeSize) {
+export const loadLayout=async (layoutData, manager, maxHeight, scene, perspectiveCamera, controls, planeSize) => {
   if (!Array.isArray(layoutData) || layoutData.length === 0) return;
 
   const loader = new GLTFLoader(manager);
   await Promise.all(
     layoutData.map(async (item) => {
       try {
-        const { default: modelUrl } = await import(`../models/${item.filename}?url`);
+        const { default: modelUrl } = await import(`../models/${item.filename}.glb?url`);
         const gltf = await loader.loadAsync(modelUrl);
         const box = new THREE.Box3().setFromObject(gltf.scene);
         const center = box.getCenter(new THREE.Vector3());
         gltf.scene.position.sub(center);
-        gltf.scene.position.y += 0.005;
+        gltf.scene.position.x += item.position.x || 0;
+        gltf.scene.position.y += item.position.y || 0;
+        gltf.scene.position.z += item.position.z || 0;
 
         gltf.scene.name = item.name || item.filename;
 
@@ -30,7 +32,7 @@ export async function loadLayout(layoutData, manager, maxHeight, scene, perspect
         });
         scene.add(gltf.scene);
       } catch (err) {
-        console.error(`Error loading ${item.filename}:`, err);
+        alert(`Error loading ${item.filename}:`, err);
       }
     })
   );
@@ -49,8 +51,8 @@ export async function loadLayout(layoutData, manager, maxHeight, scene, perspect
   controls.zoomSpeed = 1.6;
 }
 
-export async function updateProjectLayout(projectId, layoutData, token) {
-  const response = await fetch(`/api/projects/${projectId}/layout`, {
+export const updateProjectLayout=async (projectId, layoutData, token)=>{
+  const response = await fetch(`http://localhost:5000/api/projects/${projectId}/layout`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

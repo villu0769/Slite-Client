@@ -1,0 +1,24 @@
+:root {
+  --bg: #ffffff;
+  --bg-soft: #f3f4f6;
+  --text: #111827;
+  --border: #d1d5db;
+  --accent: #2563eb;
+
+  --menu-shadow: 0 10px 30px rgba(0,0,0,.15);
+}
+
+[data-theme='dark'] {
+  --bg: #111827;
+  --bg-soft: #1f2937;
+  --text: #e5e7eb;
+  --border: #374151;
+  --accent: #3b82f6;
+  --menu-shadow: 0 10px 30px rgba(0,0,0,.6);
+}
+* {
+  transition:
+    background-color .3s ease,
+    color .3s ease,
+    border-color .3s ease;
+}
