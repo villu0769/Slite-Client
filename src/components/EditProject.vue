@@ -422,7 +422,7 @@ async function startDragFromMenu(item) {
   dragPlane.setFromNormalAndCoplanarPoint(DRAG_PLANE_NORMAL, new THREE.Vector3(0, 0, 0));
 
   // start loading model async
-  const url = '/src/models/table.glb'; // for now: always use table
+  const url = `/src/models/${draggedItem.filename}.glb`;
   let gltf;
   try {
     // We intentionally don't await here to avoid blocking UI; we use the promise result when ready.
@@ -460,7 +460,7 @@ async function startDragFromMenu(item) {
   } catch (e) {
     console.warn('Grounding failed:', e);
   }
-
+  
   // add preview to scene immediately (visible when pointer moves over canvas)
   scene.add(previewObject);
 
@@ -519,10 +519,11 @@ function finalizeDropAt(posWorld) {
     bb.getSize(size);
     finalObject.position.y = posWorld.y + size.y / 2;
   }
-
+  finalObject.name = draggedItem.name;
+  finalObject.userData = { filename: draggedItem.filename };
   // add to scene
   scene.add(finalObject);
-  addToLayoutData(finalObject, 'table');
+  addToLayoutData(finalObject);
 
   // select it
   selectedObjects.length = 0;
@@ -533,7 +534,7 @@ function finalizeDropAt(posWorld) {
   const box = new THREE.Box3().setFromObject(finalObject);
   const size = new THREE.Vector3();
   box.getSize(size);
-  updateProps(finalObject.name || draggedItem?.label || 'Furniture', `w:${size.x.toFixed(2)} h:${size.y.toFixed(2)} d:${size.z.toFixed(2)}`);
+  updateProps(finalObject.name || draggedItem?.name || 'Furniture', `w:${size.x.toFixed(2)} h:${size.y.toFixed(2)} d:${size.z.toFixed(2)}`);
 
   // remove preview safely
   if (previewObject && previewObject.parent) {
@@ -621,11 +622,11 @@ function initPropsMenu() {
 
 initPropsMenu();
 
-function addToLayoutData(object3D, name) {
+function addToLayoutData(object3D) {
   const entry = {
     id: uuidv4(),
-    name,
-    filename: 'table',
+    name:object3D.name,
+    filename: object3D.userData.filename,
     position: {
       x: object3D.position.x,
       y: object3D.position.y,

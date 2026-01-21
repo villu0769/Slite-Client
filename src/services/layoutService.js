@@ -18,7 +18,7 @@ export const loadLayout=async (layoutData, manager, maxHeight, scene, perspectiv
         gltf.scene.position.z += item.position.z || 0;
 
         gltf.scene.name = item.name || item.filename;
-
+        gltf.scene.userData = { id:item.id,filename: item.filename };
         gltf.scene.traverse((node) => {
           if (node.isMesh && node.material) {
             const mats = Array.isArray(node.material) ? node.material : [node.material];

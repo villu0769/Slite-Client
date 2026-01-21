@@ -29,7 +29,7 @@
             class="category-btn"
             @click="openCategory(cat.id)"
           >
-            {{ cat.label }}
+            {{ cat.name }}
           </button>
         </div>
 
@@ -39,11 +39,11 @@
           <div class="item-buttons">
             <button
               v-for="item in visibleItems"
-              :key="item.id"
+              :key="item.filename"
               class="item-btn"
               @pointerdown.prevent="$emit('start-drag', item)"
             >
-              {{ item.label }}
+              {{ item.name }}
             </button>
           </div>
         </div>
@@ -197,18 +197,18 @@ onBeforeUnmount(() => {
    CONTENT: categories -> items
 ------------------------- */
 const categories = [
-  { id: 'living', label: 'Living Room' },
-  { id: 'bedroom', label: 'Bedroom' },
+  { id: 'living', name: 'Living Room' },
+  { id: 'bedroom', name: 'Bedroom' },
 ];
 
 const furnitureByCategory = {
   living: [
-    { id: 'sofa', label: 'Sofa' },
-    { id: 'table', label: 'Table' },
+    { filename: 'sofa', name: 'Sofa' },
+    { filename: 'table', name: 'Table' },
   ],
   bedroom: [
-    { id: 'bed', label: 'Bed' },
-    { id: 'wardrobe', label: 'Wardrobe' },
+    { filename: 'bed', name: 'Bed' },
+    { filename: 'wardrobe', name: 'Wardrobe' },
   ],
 };
 
@@ -217,7 +217,7 @@ const transitionName = ref('slide-left');
 
 const currentCategoryLabel = computed(() => {
   const c = categories.find(x => x.id === selectedCategory.value);
-  return c ? c.label : '';
+  return c ? c.name : '';
 });
 
 const visibleItems = computed(() => furnitureByCategory[selectedCategory.value] || []);
