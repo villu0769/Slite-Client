@@ -13,10 +13,10 @@ export const loadLayout=async (layoutData, manager, maxHeight, scene, perspectiv
         const box = new THREE.Box3().setFromObject(gltf.scene);
         const center = box.getCenter(new THREE.Vector3());
         gltf.scene.position.sub(center);
-        gltf.scene.position.x += item.position.x || 0;
-        gltf.scene.position.y += item.position.y || 0;
-        gltf.scene.position.z += item.position.z || 0;
-
+        gltf.scene.position.x = item.position.x || 0;
+        gltf.scene.position.y = item.position.y || 0;
+        gltf.scene.position.z = item.position.z || 0;
+        gltf.scene.rotation.y = item.rotation.y || 0;
         gltf.scene.name = item.name || item.filename;
         gltf.scene.userData = { id:item.id,filename: item.filename };
         gltf.scene.traverse((node) => {
@@ -51,12 +51,12 @@ export const loadLayout=async (layoutData, manager, maxHeight, scene, perspectiv
   controls.zoomSpeed = 1.6;
 }
 
-export const updateProjectLayout=async (projectId, layoutData, token)=>{
+export const updateProjectLayout=async (projectId, layoutData)=>{
   const response = await fetch(`http://localhost:5000/api/projects/${projectId}/layout`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`, 
+      Authorization: `Bearer ${localStorage.getItem('token')}`, 
     },
     body: JSON.stringify({ layoutData }),
   });

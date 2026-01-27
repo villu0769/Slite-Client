@@ -32,14 +32,13 @@ function onSelectItem(item) {
 .sidebar {
   position: fixed;
   left: 0;
-  top: 56px;
-  bottom: 0;
-  width: 56px;
-  background: var(--bg);
+  background: transparent;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px;
+  gap: 10px;
+  padding: 15px;
+  z-index: 5;
+  width: 100px;
 }
 
 button {

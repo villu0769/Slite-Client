@@ -5,13 +5,15 @@
       <p @click="switchTo2D()">2D</p>
       <p @click="switchTo3D()">3D</p>
     </div>
+    <SelectionToolbar :visible="isToolbarVisible" :position="toolbarPosition" @duplicate="handleDuplicate"
+      @rotate="handleToolbarRotate" @flip="handleFlip" @delete="handleDelete" />
   </div>
 </template>
 
 <script setup>
 /* EditProject.vue: three.js scene + async drag/drop of GLB from floating menu */
 
-import { onMounted, onBeforeUnmount ,ref,watch} from 'vue';
+import { onMounted, onBeforeUnmount, ref, watch,reactive } from 'vue';
 import * as THREE from 'three';
 import { useRoute } from 'vue-router';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -24,7 +26,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { loadLayout } from '../services/layoutService'; // your existing layout loader
 import { v4 as uuidv4 } from 'uuid';//генериране на уникални id-та
 import debounce from 'lodash.debounce';
-import { updateProjectLayout } from '../services/layoutService'; 
+import { updateProjectLayout } from '../services/layoutService';
 const saveLayoutDebounced = debounce(saveLayout, 500);
 
 const props = defineProps({
@@ -43,10 +45,10 @@ const layoutData = ref(
    Renderer / scene setup
 ------------------------- */
 let renderWidth = window.innerWidth;
-let renderHeight = window.innerHeight * 15 / 16;
+let renderHeight = window.innerHeight - 56;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x70787A);
+scene.background = new THREE.Color(0xb5bbcf);
 
 const aspect = renderWidth / renderHeight;
 const perspectiveCamera = new THREE.PerspectiveCamera(75, aspect, 0.1, 10000);
@@ -67,7 +69,7 @@ orthoCamera.lookAt(0, 0, 0);
 let activeCamera = perspectiveCamera;
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-try { renderer.outputEncoding = THREE.sRGBEncoding; } catch (e) { try { renderer.outputColorSpace = THREE.SRGBColorSpace; } catch (_) {} }
+try { renderer.outputEncoding = THREE.sRGBEncoding; } catch (e) { try { renderer.outputColorSpace = THREE.SRGBColorSpace; } catch (_) { } }
 renderer.setPixelRatio(window.devicePixelRatio || 1);
 renderer.setSize(renderWidth, renderHeight);
 renderer.domElement.style.touchAction = 'none';
@@ -89,20 +91,24 @@ scene.add(dir);
 const manager = new THREE.LoadingManager();
 const planeSize = 40;
 const maxHeight = 15;
-const textureLoader = new THREE.TextureLoader(manager);
-const texture = textureLoader.load('/src/assets/checker.png');
-texture.wrapS = THREE.RepeatWrapping;
-texture.wrapT = THREE.RepeatWrapping;
-texture.magFilter = THREE.NearestFilter;
-try { texture.colorSpace = THREE.SRGBColorSpace; } catch (e) {}
-texture.repeat.set(planeSize / 2, planeSize / 2);
 
-const planeGeo = new THREE.PlaneGeometry(planeSize, planeSize);
-const planeMat = new THREE.MeshPhongMaterial({ map: texture, side: THREE.DoubleSide });
-const mesh = new THREE.Mesh(planeGeo, planeMat);
-mesh.name = 'floor';
-mesh.rotation.x = Math.PI * -0.5;
-scene.add(mesh);
+/* -------------------------
+   Floor Grid
+------------------------- */
+const gridSize = 40;
+const divisions = 40;
+
+const grid = new THREE.GridHelper(
+  gridSize,
+  divisions,
+  0x999999, // main lines
+  0x888888  // secondary lines
+);
+
+grid.position.y = 0;
+grid.name = 'floor';
+
+scene.add(grid);
 
 /* Load initial layout into scene (your existing function) */
 loadLayout(layoutData.value, manager, maxHeight, scene, perspectiveCamera, controls, planeSize);
@@ -130,13 +136,7 @@ composer.setSize(renderWidth, renderHeight);
 
 /* Render loop */
 let fps = 0;
-function animate() {
-  fps++;
-  if (fps & 1) return;
-  if (controls) controls.update();
-  composer.render();
-}
-renderer.setAnimationLoop(animate);
+
 
 /* Raycaster, helpers, selection */
 const raycaster = new THREE.Raycaster();
@@ -148,15 +148,6 @@ function findRootForSelection(obj) {
     o = o.parent;
   }
   return o;
-}
-
-function clearSelection() {
-  selectedObjects.length = 0;
-  activeOutlinePass.selectedObjects = selectedObjects;
-  if (propsMenu) {
-    propsMenu.style.opacity = 0;
-    propsMenu.style.width = '0';
-  }
 }
 
 /* Keyboard */
@@ -244,6 +235,7 @@ function onPointerDownForDrag(e) {
   const box = new THREE.Box3().setFromObject(dragObject);
   const size = new THREE.Vector3();
   box.getSize(size);
+  updateToolbarPosition(); 
   updateProps(root.name, `width: ${size.x.toFixed(2)}, height: ${size.y.toFixed(2)}, depth: ${size.z.toFixed(2)}`);
   activeOutlinePass.selectedObjects = selectedObjects;
   e.preventDefault();
@@ -271,7 +263,7 @@ function onPointerMoveForDrag(e) {
     targetWorld.y = currentWorld.y;
   }
 
-  const floorBox = new THREE.Box3().setFromObject(mesh);
+  const floorBox = new THREE.Box3().setFromObject(grid);
   const objBox = new THREE.Box3().setFromObject(dragObject);
 
   const desiredDelta = new THREE.Vector3().subVectors(targetWorld, currentWorld);
@@ -293,7 +285,7 @@ function onPointerMoveForDrag(e) {
 
 function onPointerUpForDrag(e) {
   if (dragging) {
-    try { renderer.domElement.releasePointerCapture(e.pointerId); } catch (_) {}
+    try { renderer.domElement.releasePointerCapture(e.pointerId); } catch (_) { }
     controls.enabled = true;
     updateProps(
       dragObject.name || 'Object',
@@ -460,7 +452,7 @@ async function startDragFromMenu(item) {
   } catch (e) {
     console.warn('Grounding failed:', e);
   }
-  
+
   // add preview to scene immediately (visible when pointer moves over canvas)
   scene.add(previewObject);
 
@@ -517,7 +509,7 @@ function finalizeDropAt(posWorld) {
     const bb = new THREE.Box3().setFromObject(finalObject);
     const size = new THREE.Vector3();
     bb.getSize(size);
-    finalObject.position.y = posWorld.y + size.y / 2;
+    // finalObject.position.y = posWorld.y + size.y / 2;
   }
   finalObject.name = draggedItem.name;
   finalObject.userData = { filename: draggedItem.filename };
@@ -597,27 +589,69 @@ function onMenuDragEnd(e) {
    Utilities / UI props panel (your existing code)
 ------------------------- */
 var propsMenu, selectedName, selectedCoords;
+let rotateInput, rotateLeftBtn, rotateRightBtn;
+
 function initPropsMenu() {
   propsMenu = document.createElement('div');
   propsMenu.id = 'props-menu';
   propsMenu.style.touchAction = 'none';
   propsMenu.style.userSelect = 'none';
+
   selectedName = document.createElement('p');
   selectedCoords = document.createElement('p');
   selectedName.id = 'props-selected-name';
   selectedCoords.id = 'props-selected-coords';
+
   propsMenu.appendChild(selectedName);
   propsMenu.appendChild(selectedCoords);
-  const rightHandle = document.createElement('div');
-  rightHandle.className = 'props-resize-handle right-handle';
-  const bottomHandle = document.createElement('div');
-  bottomHandle.className = 'props-resize-handle bottom-handle';
-  propsMenu.appendChild(rightHandle);
-  propsMenu.appendChild(bottomHandle);
+
+  // --- rotate UI block ---
+  const rotateContainer = document.createElement('div');
+  rotateContainer.id = 'props-rotate';
+  rotateContainer.style.display = 'flex';
+  rotateContainer.style.gap = '6px';
+  rotateContainer.style.alignItems = 'center';
+  rotateContainer.style.marginTop = '8px';
+
+  // left rotate (-15deg)
+  rotateLeftBtn = document.createElement('button');
+  rotateLeftBtn.type = 'button';
+  rotateLeftBtn.innerText = '⟲';
+  rotateLeftBtn.title = 'Rotate -15°';
+  rotateLeftBtn.addEventListener('click', () => rotateSelectedDelta(-15));
+
+  // right rotate (+15deg)
+  rotateRightBtn = document.createElement('button');
+  rotateRightBtn.type = 'button';
+  rotateRightBtn.innerText = '⟳';
+  rotateRightBtn.title = 'Rotate +15°';
+  rotateRightBtn.addEventListener('click', () => rotateSelectedDelta(15));
+
+  // numeric input (degrees)
+  rotateInput = document.createElement('input');
+  rotateInput.type = 'number';
+  rotateInput.step = '1';
+  rotateInput.min = '-360';
+  rotateInput.max = '360';
+  rotateInput.value = '0';
+  rotateInput.style.width = '64px';
+  rotateInput.title = 'Rotation (degrees)';
+  rotateInput.addEventListener('change', onRotateInputChange);
+  rotateInput.addEventListener('blur', onRotateInputChange);
+  rotateInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') onRotateInputChange(); });
+
+  rotateContainer.appendChild(rotateLeftBtn);
+  rotateContainer.appendChild(rotateRightBtn);
+  rotateContainer.appendChild(rotateInput);
+
+  propsMenu.appendChild(rotateContainer);
+  // --- end rotate UI ---
+
+
+
   const appEl = document.getElementById('app') || document.body;
   appEl.appendChild(propsMenu);
-  rightHandle.addEventListener('pointerdown', (ev) => startMenuResize(ev, 'right'));
-  bottomHandle.addEventListener('pointerdown', (ev) => startMenuResize(ev, 'bottom'));
+
 }
 
 initPropsMenu();
@@ -625,7 +659,7 @@ initPropsMenu();
 function addToLayoutData(object3D) {
   const entry = {
     id: uuidv4(),
-    name:object3D.name,
+    name: object3D.name,
     filename: object3D.userData.filename,
     position: {
       x: object3D.position.x,
@@ -655,8 +689,7 @@ async function saveLayout() {
     console.log('Saving layout...', projectId);
     await updateProjectLayout(
       projectId,
-      layoutData.value,
-      localStorage.getItem('token')
+      layoutData.value
     );
 
   } catch (err) {
@@ -667,62 +700,78 @@ async function saveLayout() {
 }
 
 
-/* (Your existing props menu resizing code — kept unchanged) */
-let menuResizing = false;
-let menuResizeDir = null;
-let menuStartX = 0, menuStartY = 0, menuStartW = 0, menuStartH = 0;
-const MENU_MIN_W = 160;
-const MENU_MIN_H = 80;
-const MENU_EDGE_PAD = 40;
+function updateProps(name, coords) {
+  // original behavior
+  try {
+    propsMenu.style.width = '220px';
+    propsMenu.style.opacity = 1;
+    if (selectedName) selectedName.innerHTML = name || '';
+    if (selectedCoords) selectedCoords.innerHTML = coords || '';
+  } catch (e) {
+    // ignore if propsMenu missing
+  }
 
-function startMenuResize(ev, dir) {
-  ev.preventDefault();
-  ev.stopPropagation();
-  if (!propsMenu) return;
-  menuResizing = true;
-  menuResizeDir = dir;
-  const rect = propsMenu.getBoundingClientRect();
-  menuStartX = ev.clientX;
-  menuStartY = ev.clientY;
-  menuStartW = rect.width;
-  menuStartH = rect.height;
-  try { ev.target.setPointerCapture(ev.pointerId); } catch (e) {}
-  window.addEventListener('pointermove', onMenuResizeMove, { passive: false });
-  window.addEventListener('pointerup', onMenuResizeEnd, { passive: false });
-  document.body.style.cursor = (dir === 'right') ? 'ew-resize' : 'ns-resize';
-}
-function onMenuResizeMove(ev) {
-  if (!menuResizing || !propsMenu) return;
-  ev.preventDefault();
-  const dx = ev.clientX - menuStartX;
-  const dy = ev.clientY - menuStartY;
-  const maxW = Math.max(MENU_MIN_W, window.innerWidth - MENU_EDGE_PAD);
-  const maxH = Math.max(MENU_MIN_H, window.innerHeight - MENU_EDGE_PAD);
-  if (menuResizeDir === 'right') {
-    let newW = Math.round(menuStartW + dx);
-    newW = Math.max(MENU_MIN_W, Math.min(maxW, newW));
-    propsMenu.style.width = newW + 'px';
-  } else if (menuResizeDir === 'bottom') {
-    let newH = Math.round(menuStartH + dy);
-    newH = Math.max(MENU_MIN_H, Math.min(maxH, newH));
-    propsMenu.style.height = newH + 'px';
+  // sync rotate UI to currently selected object
+  if (!rotateInput) return; // UI not created yet
+  const obj = selectedObjects[0];
+  if (!obj) {
+    // no selection → disable / clear input
+    rotateInput.value = '0';
+    rotateLeftBtn.disabled = true;
+    rotateRightBtn.disabled = true;
+  } else {
+    rotateLeftBtn.disabled = false;
+    rotateRightBtn.disabled = false;
+    refreshRotationUI(obj);
   }
 }
-function onMenuResizeEnd(ev) {
-  if (!menuResizing) return;
-  try { ev.target.releasePointerCapture && ev.target.releasePointerCapture(ev.pointerId); } catch (_) {}
-  menuResizing = false;
-  menuResizeDir = null;
-  window.removeEventListener('pointermove', onMenuResizeMove);
-  window.removeEventListener('pointerup', onMenuResizeEnd);
-  document.body.style.cursor = '';
+/* -------------------------Rotation UI logic------------------------- */
+function degToRad(d) { return d * Math.PI / 180; }
+function radToDeg(r) { return r * 180 / Math.PI; }
+
+function refreshRotationUI(obj) {
+  if (!rotateInput || !obj) return;
+  const deg = Math.round((radToDeg(obj.rotation.y) + 360) % 360);
+  rotateInput.value = String(deg);
 }
-function updateProps(name, coords) {
-  propsMenu.style.width = '220px';
-  propsMenu.style.opacity = 1;
-  selectedName.innerHTML = name;
-  selectedCoords.innerHTML = coords;
+
+function rotateSelectedDelta(deltaDeg) {
+  const obj = selectedObjects[0];
+  if (!obj) return;
+  obj.rotation.y += degToRad(deltaDeg);
+  refreshRotationUI(obj);
+  updateLayoutEntryFromObject(obj);
+  saveLayoutDebounced();
 }
+
+function onRotateInputChange() {
+  const obj = selectedObjects[0];
+  if (!obj || !rotateInput) return;
+  const num = Number(rotateInput.value);
+  if (isNaN(num)) return;
+  obj.rotation.y = degToRad(num);
+  refreshRotationUI(obj);
+  updateLayoutEntryFromObject(obj);
+  saveLayoutDebounced();
+}
+
+
+/** update layoutData entry for the object (by userData.id) */
+function updateLayoutEntryFromObject(object3D) {
+  if (!object3D || !object3D.userData) return;
+  const id = object3D.userData.id || object3D.userData._id;
+  if (!id) return;
+  const entry = layoutData.value.find(x => x.id === id);
+  if (!entry) return;
+  entry.position.x = object3D.position.x;
+  entry.position.y = object3D.position.y;
+  entry.position.z = object3D.position.z;
+  entry.rotation.y = object3D.rotation.y;
+  entry.scale.x = object3D.scale.x;
+  entry.scale.y = object3D.scale.y;
+  entry.scale.z = object3D.scale.z;
+}
+
 
 /* -------------------------
    Window resize handling
@@ -753,7 +802,7 @@ const { theme } = useTheme();
 
 watch(theme, (t) => {
   scene.background = new THREE.Color(
-    t === 'dark' ? 0x020617 : 0x70787A
+    t === 'dark' ? 0x303541 : 0xb5bbcf
   );
 });
 
@@ -765,7 +814,6 @@ onMounted(() => {
   // append renderer canvas
   const container = document.getElementById('edit-project-container');
   if (container) container.appendChild(renderer.domElement);
-
   composer.setSize(renderWidth, renderHeight);
   if (typeof outlinePass3D.setSize === 'function') outlinePass3D.setSize(renderWidth, renderHeight);
   if (typeof outlinePass2D.setSize === 'function') outlinePass2D.setSize(renderWidth, renderHeight);
@@ -777,7 +825,7 @@ onBeforeUnmount(() => {
   // remove listeners
   window.removeEventListener('resize', onWindowResize);
   window.removeEventListener('keydown', onKeyDown);
-  try { renderer.domElement.removeEventListener('pointerdown', onPointerDownForDrag); } catch(e) {}
+  try { renderer.domElement.removeEventListener('pointerdown', onPointerDownForDrag); } catch (e) { }
   window.removeEventListener('pointermove', onPointerMoveForDrag);
   window.removeEventListener('pointerup', onPointerUpForDrag);
   // remove any in-progress menu drag listeners
@@ -798,7 +846,7 @@ onBeforeUnmount(() => {
 let currMode = 3;
 function bindControllerToCamera(cam) {
   if (controls) {
-    try { controls.dispose(); } catch (_) {}
+    try { controls.dispose(); } catch (_) { }
   }
   controls = new OrbitControls(cam, renderer.domElement);
   controls.enableDamping = true;
@@ -830,6 +878,149 @@ function switchTo3D() {
   composer.addPass(outlinePass3D);
   controls.enableRotate = true;
   activeCamera.updateProjectionMatrix();
+}
+
+// Импортирай новия компонент най-горе
+import SelectionToolbar from '../components/SelectionToolbar.vue';
+
+// --- Нови REFS за Toolbar-а ---
+const isToolbarVisible = ref(false);
+const toolbarPosition = reactive({ x: 0, y: 0 });
+
+// --- Функция за изчисляване на 2D позиция от 3D обект ---
+function updateToolbarPosition() {
+  if (selectedObjects.length === 0) {
+    isToolbarVisible.value = false;
+    return;
+  }
+  
+  const obj = selectedObjects[0];
+  if (!obj) return;
+
+  // 1. Намираме центъра на обекта в 3D света
+  const box = new THREE.Box3().setFromObject(obj);
+  const center = box.getCenter(new THREE.Vector3());
+  
+  // Опционално: вдигаме малко нагоре, за да е над обекта
+  center.y = box.max.y+3; 
+
+  // 2. Проектираме 3D координатите към 2D екрана
+  const vector = center.clone();
+  vector.project(activeCamera);
+
+  // 3. Преобразуваме NDC (-1 до +1) към пиксели на екрана
+  const halfWidth = window.innerWidth / 2;
+  const halfHeight = window.innerHeight / 2;
+
+  toolbarPosition.x = (vector.x * halfWidth) + halfWidth;
+  toolbarPosition.y = -(vector.y * halfHeight) + halfHeight;
+  
+  isToolbarVisible.value = true;
+}
+
+function animate() {
+  fps++;
+  if (fps & 1) return;
+  if (controls) controls.update();
+  
+  // Добави това:
+  if (selectedObjects.length > 0) {
+    updateToolbarPosition();
+  }
+
+  composer.render();
+}
+
+renderer.setAnimationLoop(animate);
+
+// В `clearSelection()` добави:
+function clearSelection() {
+  selectedObjects.length = 0;
+  activeOutlinePass.selectedObjects = selectedObjects;
+  isToolbarVisible.value = false; 
+    selectedObjects.length = 0;
+  activeOutlinePass.selectedObjects = selectedObjects;
+  if (propsMenu) {
+    propsMenu.style.opacity = 0;
+    propsMenu.style.width = '0';
+  }
+}
+
+
+function handleDuplicate() {
+  const original = selectedObjects[0];
+  if (!original) return;
+
+  const clone = deepCloneScene(original);
+  
+  // Преместваме клонинга малко встрани, за да се вижда
+  clone.position.x += 2;
+  clone.position.z += 2;
+  
+  // Важно: Ново уникално ID
+  clone.userData.id = uuidv4(); 
+  // Запазваме оригиналния filename за layout-а
+  clone.userData.filename = original.userData.filename;
+
+  scene.add(clone);
+  addToLayoutData(clone); // Добавяне в JSON структурата
+
+  // Селектираме новия обект
+  selectedObjects[0] = clone;
+  activeOutlinePass.selectedObjects = selectedObjects;
+  updateToolbarPosition();
+}
+
+function handleToolbarRotate(angleDeg) {
+    // Използваме вече съществуващата функция
+    rotateSelectedDelta(angleDeg);
+}
+
+function handleFlip(axis) {
+  const obj = selectedObjects[0];
+  if (!obj) return;
+
+  // Обръщането става чрез умножение на скалата по -1
+  if (axis === 'x') {
+    obj.scale.x *= -1;
+  } else if (axis === 'z') {
+    // Приемаме Z за другата хоризонтална ос
+    obj.scale.z *= -1;
+  }
+  
+  // Трябва да обновим матрицата, за да се отрази промяната
+  obj.updateMatrix();
+  
+  updateLayoutEntryFromObject(obj);
+  saveLayoutDebounced();
+}
+function handleDelete() {
+  const obj = selectedObjects[0];
+  if (!obj) return;
+
+  // 1. Премахване от сцената
+  scene.remove(obj);
+
+  // 2. Премахване от layoutData (JSON)
+  const id = obj.userData.id || obj.userData._id;
+  if (id) {
+    layoutData.value = layoutData.value.filter(item => item.id !== id);
+  }
+
+  // 3. Изчистване на ресурси (по желание, но добра практика)
+  obj.traverse(child => {
+    if (child.isMesh) {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+        else child.material.dispose();
+      }
+    }
+  });
+
+  // 4. Деселектиране и запазване
+  clearSelection();
+  saveLayoutDebounced();
 }
 
 defineExpose({ startDragFromMenu });

@@ -1,20 +1,21 @@
 :root {
   --bg: #ffffff;
-  --bg-soft: #f3f4f6;
+  --bg-soft: #d9dde5;
   --text: #111827;
   --border: #d1d5db;
-  --accent: #2563eb;
-
-  --menu-shadow: 0 10px 30px rgba(0,0,0,.15);
+  --accent: #9babce;
+  --scene-background: #b5bbcf;
+  --menu-shadow: 0 0 6px rgba(0,0,0,.2);
 }
 
 [data-theme='dark'] {
-  --bg: #111827;
+  --bg: #101318;
   --bg-soft: #1f2937;
   --text: #e5e7eb;
   --border: #374151;
-  --accent: #3b82f6;
-  --menu-shadow: 0 10px 30px rgba(0,0,0,.6);
+  --accent: #213350;
+  --scene-background: #1f232a;
+  --menu-shadow: 0 10px 30px rgba(0,0,0,.5);
 }
 * {
   transition:

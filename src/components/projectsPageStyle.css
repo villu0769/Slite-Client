@@ -1,0 +1,179 @@
+#projects-page {
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  background: var(--bg);
+}
+/* =========================================
+   2. HEADER (Top Bar - Updated)
+   ========================================= */
+.project-card {
+  z-index: 50;
+  
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Разделя инфо (ляво) и бутони (дясно) */
+  gap: 24px;
+ 
+  width: 100%;
+  padding: 8px 12px;
+  
+  /* Glassmorphism */
+  background: color-mix(in srgb, var(--bg-soft), transparent 20%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  
+  border: 1px solid var(--border);
+  box-shadow: var(--menu-shadow);
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none; /* За да не се маркира текста при работа */
+}
+.project-card:hover {
+  box-shadow: var(--menu-shadow-hover);
+
+}
+
+/* Лява зона: Картинка + Текст */
+.header-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  overflow: hidden; /* За дълги имена */
+}
+
+/* Контейнер за картинката */
+.header-preview {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.header-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Текст на заглавието */
+.header-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* Три точки, ако името е много дълго */
+}
+
+/* Дясна зона: Бутони */
+.header-actions {
+  display: flex;
+  align-items: center;
+}
+
+/* Бутон за изтриване */
+.delete-btn {
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text);
+  opacity: 0.6;
+  transition: all 0.2s;
+}
+
+.delete-btn:hover {
+  opacity: 1;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger), transparent 85%);
+  transform: scale(1.05);
+}
+
+.delete-btn:active {
+  transform: scale(0.95);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+}
+
+/* Когато е disabled, махаме ховър ефектите */
+.delete-btn:disabled {
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* --- Контейнер на страницата --- */
+.page-container {
+  width: 100%;
+  margin: 0 auto;
+  padding: 50px;
+  box-sizing: border-box;
+}
+
+/* --- Header с бутон --- */
+.page-header {
+  display: flex;
+  justify-content: flex-start; /* Бутонът вляво (или flex-end за вдясно) */
+  margin-bottom: 24px;
+}
+
+/* --- Стилизиран бутон (+ New) --- */
+.btn-primary {
+  background-color: var(--accent); /* Синьото от темата */
+  color: var(--text);
+  border: none;
+  padding: 10px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s, filter 0.2s;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+/* --- Лоудинг Спинер (замества v-progress-circular) --- */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  padding: 40px;
+  width: 100%;
+}
+.project-card-wrapper {
+  width: 30%;
+  max-width: 90vw;
+  min-width: 300px;
+}
+/* --- Решетка с проекти (Flexbox Grid) --- */
+.projects-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px; /* Разстояние между картите */
+  justify-content: flex-start;
+}

@@ -9,7 +9,7 @@ canvas{
 }
 #bottom-menu{
   position: absolute;
-  top: 92vh;
+  top: 80vh;
   width: fit-content;
   display: flex;
   left: 50%;
@@ -17,10 +17,17 @@ canvas{
   justify-content: center;
   z-index: 3;
 }
+#edit-project-container{
+  position: fixed;
+  left: 0;
+  z-index: 1;
+}
 #bottom-menu p{
-  padding: 4px;
-  border: 1px solid black;
-  background-color: white;
+  padding: 9px;
+  font-weight: 900;
+  color:var(--text);
+  border: var(--border);
+  background-color: var(--bg-soft);
   border-radius: 5px;
   margin:3px;
 }
@@ -89,7 +96,411 @@ canvas{
 }
 .right-handle::before { transform: rotate(90deg); }
 
-#edit-project-container{
-  margin-left: 56px;
-  max-width: calc(100% - 56px);
+
+
+
+/* --- EditProjectStyle.css --- */
+
+/* Основен контейнер на менюто */
+/* --- Props Menu (Дясната лента с настройки) --- */
+
+#props-menu {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 20; /* Гарантира, че е над сцената */
+
+  /* Glassmorphism с твоите променливи */
+  /* Използваме --bg-soft с 15% прозрачност за ефекта на стъкло */
+  background: color-mix(in srgb, var(--bg-soft), transparent 15%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  /* Граници и сенки от темата */
+  border: 1px solid var(--border);
+  box-shadow: var(--menu-shadow);
+  border-radius: 16px;
+
+  /* Размери и преходи */
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+
+  /* Текст */
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  /* Първоначално състояние */
+  opacity: 0;
+  width: 0;
+  pointer-events: none;
+}
+
+/* Активно състояние */
+#props-menu[style*="opacity: 1"] {
+  padding: 16px;
+  pointer-events: auto;
+}
+
+/* Име на обекта */
+#props-selected-name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--text);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Координати/Размери */
+#props-selected-coords {
+  margin: 0;
+  font-size: 12px;
+  font-family: 'Menlo', 'Consolas', monospace;
+  /* Използваме --text с намалена видимост вместо твърд сив цвят */
+  color: var(--text);
+  opacity: 0.7;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Контейнер за ротацията */
+#props-rotate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  
+  /* Лек контраст за контейнера на инструментите */
+  background: color-mix(in srgb, var(--bg), transparent 50%);
+  border: 1px solid var(--border);
+  
+  padding: 4px;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+/* Бутони за ротация */
+#props-rotate button {
+  /* Лек фон базиран на текста за неутрален вид */
+  background: color-mix(in srgb, var(--text), transparent 95%);
+  border: none;
+  color: var(--text);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: background-color 0.2s, transform 0.1s, color 0.2s;
+}
+
+#props-rotate button:hover:not(:disabled) {
+  /* Акцентен цвят при ховър */
+  background: var(--accent);
+  color: #ffffff; /* Винаги бял текст върху акцентния цвят */
+}
+
+#props-rotate button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+#props-rotate button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Инпут поле за градуси */
+#props-rotate input {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: 'Menlo', monospace;
+  font-size: 13px;
+  text-align: center;
+  width: 50px !important;
+  outline: none;
+  transition: color 0.2s;
+}
+
+#props-rotate input:focus {
+  color: var(--accent); /* Цвят на текста при писане */
+}
+
+/* Скриване на стрелките на input type="number" */
+#props-rotate input::-webkit-outer-spin-button,
+#props-rotate input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+#props-rotate input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.floating-menu {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  
+  /* Glassmorphism */
+  background: color-mix(in srgb, var(--bg-soft), transparent 17%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  
+  border: 1px solid var(--border);
+  box-shadow: var(--menu-shadow);
+  border-radius: 16px;
+  
+  /* Увери се, че box-sizing е border-box, за да не се бъркат padding-ите */
+  box-sizing: border-box; 
+  
+  touch-action: none;
+  overflow: hidden;
+}
+.floating-menu *{
+  z-index: 13 !important;
+}
+/* При активност (напр. drag) леко повдигане */
+.floating-menu:active {
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+}
+
+/* --- Menu Header (Drag Handle) --- */
+.menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  height: 50px;
+  flex-shrink: 0; /* Да не се свива */
+  
+  background: color-mix(in srgb, var(--bg), transparent 60%);
+  border-bottom: 1px solid color-mix(in srgb, var(--border), transparent 50%);
+  
+  cursor: grab; /* Курсор за местене */
+  user-select: none;
+}
+
+.menu-header:active {
+  cursor: grabbing;
+}
+
+.menu-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+  letter-spacing: 0.5px;
+}
+
+/* --- Header Buttons (Back & Close) --- */
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  padding: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+}
+
+.icon-btn:hover {
+  background: color-mix(in srgb, var(--text), transparent 90%);
+  color: var(--accent);
+}
+
+.close-btn:hover {
+  background: color-mix(in srgb, #ef4444, transparent 85%); /* Червеникав оттенък за затваряне */
+  color: #ef4444;
+}
+
+/* --- Menu Body --- */
+.menu-body {
+  flex: 1; /* Заема останалото пространство */
+  position: relative; /* Важно за анимациите */
+  overflow: hidden; /* Скрива излизащото съдържание по време на анимация */
+}
+
+/* Общи стилове за панелите (Categories & Items) */
+.category-list,
+.panel {
+  position: absolute; /* За да се припокриват при анимация */
+  inset: 0;
+  overflow-y: auto; /* Скролване */
+  padding: 10px;
+  
+  /* Скролбар стилизация (за да е красив) */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--border), transparent 50%) transparent;
+}
+
+/* --- Category List Styles --- */
+.category-btn {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 12px;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+  background: color-mix(in srgb, var(--bg), transparent 40%);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  
+  color: var(--text);
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+
+.category-btn:hover {
+  background: var(--bg);
+  border-color: color-mix(in srgb, var(--accent), transparent 30%);
+  transform: translateX(4px); /* Леко отместване */
+
+}
+
+.chevron {
+  opacity: 0.5;
+  transition: transform 0.2s;
+}
+.category-btn:hover .chevron {
+  opacity: 1;
+  transform: translateX(2px);
+}
+
+/* --- Items Grid --- */
+.items-header {
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border), transparent 50%);
+}
+
+.items-subtitle {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--text);
+  opacity: 0.7;
+  font-weight: 600;
+}
+/* Променяме контейнера от Grid на Flex */
+.item-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-content: flex-start; /* Елементите да стоят горе, не разпръснати */
+  /* Това предотвратява трептенето на скролбара, което също може да причини "скачане" */
+  scrollbar-gutter: stable; 
+}
+
+/* Това е много важно! Настройваме поведението на FurnitureButton вътре в контейнера */
+/* Използваме директен селектор > *, защото компонентът може да има различни класове */
+.item-buttons > * {
+  /* flex-grow: 1 -> Позволява леко разширяване, за да запълни реда
+     flex-shrink: 0 -> Не позволява смачкване под базовия размер
+     flex-basis: 100px -> Идеалната ширина на един бутон
+  */
+  flex: 1 0 120px;
+  
+  /* Ограничаваме максималната ширина! */
+  /* Това е ключовото, за да не стават огромни преди да се пренесат на нов ред */
+  max-width: 170px; 
+  
+  /* Опционално: ако искаш фиксирана височина, за да са равни */
+  height: auto; 
+}
+
+/* --- Resize Handles --- */
+.resize-handle {
+  position: absolute;
+  z-index: 101;
+  touch-action: none;
+}
+
+.resize-right {
+  top: 0;
+  right: 0;
+  bottom: 20px; /* Оставя място за ъгъла */
+  width: 6px;
+  cursor: e-resize;
+}
+
+.resize-bottom {
+  bottom: 0;
+  left: 0;
+  right: 20px;
+  height: 6px;
+  cursor: s-resize;
+}
+
+.resize-corner {
+  bottom: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  cursor: nwse-resize;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Точици в ъгъла за визуален ориентир */
+.corner-dots {
+  display: flex;
+  gap: 1px;
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+
+.corner-dots span {
+  width: 3px;
+  height: 3px;
+  background-color: var(--text);
+  border-radius: 50%;
+  opacity: 0.3;
+}
+.resize-corner:hover .corner-dots span {
+  background-color: var(--accent);
+  opacity: 1;
+}
+
+/* --- Vue Transitions (Slide Animations) --- */
+/* Slide Left (Влизане навътре в категория) */
+.slide-left-enter-active,
+.slide-left-leave-active,
+.slide-right-enter-active,
+.slide-right-leave-active {
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.slide-left-enter-from {
+  transform: translateX(100%);
+  opacity: 0;
+}
+.slide-left-leave-to {
+  transform: translateX(-20%); /* Леко отместване наляво */
+  opacity: 0;
+}
+
+/* Slide Right (Връщане назад) */
+.slide-right-enter-from {
+  transform: translateX(-100%);
+  opacity: 0;
+}
+.slide-right-leave-to {
+  transform: translateX(20%); /* Леко отместване надясно */
+  opacity: 0;
 }

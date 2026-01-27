@@ -1,27 +1,27 @@
 <template>
-  <v-container>
-    <v-row class="mb-4">
-      <v-col cols="12">
-        <v-btn color="primary" @click="handleAddNewProject">+ New</v-btn>
-      </v-col>
-    </v-row>
+  <div id="projects-page" class="page-container">
+    
+    <div class="page-header">
+      <button class="btn-primary" @click="handleAddNewProject">
+        + New Project
+      </button>
+    </div>
 
-    <v-row>
-      <v-col cols="12" class="text-center" v-if="isLoading || isFetching">
-        <v-progress-circular indeterminate color="primary" />
-      </v-col>
+    <div v-if="isLoading || isFetching" class="loading-container">
+      <div class="spinner"></div>
+    </div>
 
-      <v-col
-        v-for="project in projects"
-        :key="project._id"
-        cols="12"
-        sm="6"
-        md="4"
+    <div v-else class="projects-grid">
+      <div 
+        v-for="project in projects" 
+        :key="project._id" 
+        class="project-card-wrapper"
       >
         <ProjectPreview :projectData="project" />
-      </v-col>
-    </v-row>
-  </v-container>
+      </div>
+    </div>
+
+  </div>
 </template>
 
 <script setup>
@@ -60,3 +60,6 @@ const handleAddNewProject = () => {
   addNewProjectMutation.mutate();
 }
 </script>
+<style>
+@import '../components/projectsPageStyle.css';
+</style>
