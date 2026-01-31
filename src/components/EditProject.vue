@@ -4,18 +4,23 @@
       <p @click="switchTo2D">2D</p>
       <p @click="switchTo3D">3D</p>
     </div>
-    <SelectionToolbar :visible="isToolbarVisible" :position="toolbarPosition" @duplicate="handleDuplicate"
-      @rotate="handleToolbarRotate" @flip="handleFlip" @delete="handleDelete" />
+    <SelectionToolbar 
+      :visible="isToolbarVisible" 
+      :position="toolbarPosition" 
+      @duplicate="handleDuplicate"
+      @rotate="handleToolbarRotate" 
+      @flip="handleFlip" 
+      @delete="handleDelete" 
+    />
   </div>
 </template>
 
 <script setup>
-/* EditProject.vue: three.js scene + async drag/drop of GLB from floating menu */
+/* EditProject.vue: Cleaned & Merged Version */
 
-import { onMounted, onBeforeUnmount, ref, watch,reactive } from 'vue';
-import * as THREE from 'three';
+import { onMounted, onBeforeUnmount, ref, watch, reactive } from 'vue';
 import { useRoute } from 'vue-router';
-// ... imports for three/addons ...
+import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -23,47 +28,57 @@ import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { GammaCorrectionShader } from 'three/addons/shaders/GammaCorrectionShader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { loadLayout } from '../services/layoutService'; // your existing layout loader
-import { v4 as uuidv4 } from 'uuid';//генериране на уникални id-та
+import { v4 as uuidv4 } from 'uuid';
 import debounce from 'lodash.debounce';
-import { updateProjectLayout } from '../services/layoutService';
-const saveLayoutDebounced = debounce(saveLayout, 500);
 
+// Services & Components
+import { loadLayout, updateProjectLayout } from '../services/layoutService';
+import SelectionToolbar from '../components/SelectionToolbar.vue';
+import { useTheme } from '../composables/useTheme';
+
+/* -------------------------
+   Props & State
+------------------------- */
 const props = defineProps({
   projectData: { type: Object, required: true }
 });
 
 const route = useRoute();
 const projectId = route.params.id;
+const layoutData = ref(Array.isArray(props.projectData.layoutData) ? [...props.projectData.layoutData] : []);
 
-const layoutData = ref(
-  Array.isArray(props.projectData.layoutData)
-    ? [...props.projectData.layoutData]
-    : []
-);
+// Toolbar State
+const isToolbarVisible = ref(false);
+const toolbarPosition = reactive({ x: 0, y: 0 });
+
+// Saving State
+const saveLayoutDebounced = debounce(saveLayout, 500);
+const isSavingLayout = ref(false);
+
 /* -------------------------
-   Renderer / scene setup
+   Scene Setup
 ------------------------- */
 let renderWidth = window.innerWidth;
 let renderHeight = window.innerHeight - 56;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xb5bbcf);
-// ... Camera, Lights, Grid setup (kept same as original) ...
+
+// Cameras
 const aspect = renderWidth / renderHeight;
 const perspectiveCamera = new THREE.PerspectiveCamera(75, aspect, 0.1, 10000);
 perspectiveCamera.position.set(0, 50, 50);
 
 const frustumSize = 25;
 const orthoCamera = new THREE.OrthographicCamera(
-  (frustumSize * aspect) / -2,
-  (frustumSize * aspect) / 2,
-  frustumSize / 2,
-  frustumSize / -2,
+  (frustumSize * aspect) / -2, (frustumSize * aspect) / 2,
+  frustumSize / 2, frustumSize / -2,
   0.1, 10000
 );
 orthoCamera.position.set(0, 2, 0);
 
 let activeCamera = perspectiveCamera;
+
+// Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 if ('outputEncoding' in renderer) renderer.outputEncoding = THREE.sRGBEncoding;
 else if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -71,45 +86,34 @@ renderer.setPixelRatio(window.devicePixelRatio || 1);
 renderer.setSize(renderWidth, renderHeight);
 renderer.domElement.style.touchAction = 'none';
 
-/* Controls */
+// Controls
 let controls = new OrbitControls(activeCamera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 
-/* Lights */
+// Lights
 const light = new THREE.AmbientLight(0xFFFFFF, 1);
 const light2 = new THREE.AmbientLight(0xFFFFFF, 1);
-scene.add(light, light2);
 const dir = new THREE.DirectionalLight(0xffffff, 1);
 dir.position.set(10, 10, 10);
-scene.add(dir);
+scene.add(light, light2, dir);
 
-/* Floor */
-const manager = new THREE.LoadingManager();
+// Grid & Helpers
 const planeSize = 40;
 const maxHeight = 15;
-
-/* -------------------------
-   Floor Grid
-------------------------- */
 const gridSize = 40;
 const divisions = 40;
-
-const grid = new THREE.GridHelper(
-  gridSize,
-  divisions,
-  0x999999, // main lines
-  0x888888  // secondary lines
-);
-
+const grid = new THREE.GridHelper(gridSize, divisions, 0x999999, 0x888888);
 grid.position.y = 0;
 grid.name = 'floor';
 scene.add(grid);
 
-/* Load initial layout into scene (your existing function) */
+const manager = new THREE.LoadingManager();
 loadLayout(layoutData.value, manager, maxHeight, scene, perspectiveCamera, controls, planeSize);
 
-/* Composer + outline passes */
+/* -------------------------
+   Post-Processing
+------------------------- */
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, activeCamera);
 composer.addPass(renderPass);
@@ -119,22 +123,19 @@ outlinePass3D.edgeThickness = 2.0;
 outlinePass3D.edgeStrength = 3.0;
 outlinePass3D.visibleEdgeColor.set(0xffffff);
 composer.addPass(outlinePass3D);
-let activeOutlinePass = outlinePass3D;
 
 const outlinePass2D = new OutlinePass(new THREE.Vector2(window.innerWidth, window.innerHeight), scene, orthoCamera);
 outlinePass2D.edgeThickness = 2.0;
 outlinePass2D.edgeStrength = 3.0;
 outlinePass2D.visibleEdgeColor.set(0xffffff);
 
+let activeOutlinePass = outlinePass3D;
 const gammaPass = new ShaderPass(GammaCorrectionShader);
 composer.addPass(gammaPass);
-composer.setSize(renderWidth, renderHeight);
 
-/* Render loop */
-let fps = 0;
-
-
-/* Raycaster, helpers, selection */
+/* -------------------------
+   Raycasting & Selection Helper
+------------------------- */
 const raycaster = new THREE.Raycaster();
 const selectedObjects = [];
 
@@ -146,31 +147,6 @@ function findRootForSelection(obj) {
   return o;
 }
 
-/* Keyboard */
-function onKeyDown(e) {
-  if (e.key === 'Escape' || e.key === 'Esc' || e.keyCode === 27) {
-    clearSelection();
-    // also cancel menu drag if needed
-    cancelMenuDragIfAny();
-  }
-}
-window.addEventListener('keydown', onKeyDown);
-
-/* -------------------------
-   Dragging existing objects
-------------------------- */
-const DRAG_PLANE_NORMAL = new THREE.Vector3(0, 1, 0);
-const GRID_SNAP = { enabled: false, size: 0.1 };
-let dragging = false;
-let dragObject = null;
-let dragOffset = new THREE.Vector3();
-const dragPlane = new THREE.Plane();
-const intersectionPoint = new THREE.Vector3();
-const tempVec = new THREE.Vector3();
-const tempVec2 = new THREE.Vector3();
-dragPlane.normal.copy(DRAG_PLANE_NORMAL);
-
-/* Helper functions */
 function getWorldPosition(obj, target = new THREE.Vector3()) {
   obj.updateWorldMatrix(true, false);
   return obj.getWorldPosition(target);
@@ -192,6 +168,87 @@ function snapVec(v, size) {
   );
 }
 
+/* -------------------------
+   ROOM / FLOOR LOGIC (The Constraints)
+------------------------- */
+function getAllFloors() {
+  const floors = [];
+  scene.traverse((child) => {
+    if (child.userData && child.userData.filename === 'custom_floor') {
+      floors.push(child);
+    }
+  });
+  return floors;
+}
+
+function constrainPositionToFloors(targetPos, object) {
+  const floors = getAllFloors();
+  if (floors.length === 0) {
+    // Ако няма стаи, ползваме ограниченията на grid-а като fallback
+    const floorBox = new THREE.Box3().setFromObject(grid);
+    const objBox = new THREE.Box3().setFromObject(object);
+    
+    // Преизчисляваме delta спрямо текущата позиция за по-лесно клампване (или директно клампваме координатите)
+    // Тук правим прост clamp в рамките на GridHelper-а
+    const halfW = (objBox.max.x - objBox.min.x) / 2;
+    const halfD = (objBox.max.z - objBox.min.z) / 2;
+    
+    const minX = floorBox.min.x + halfW;
+    const maxX = floorBox.max.x - halfW;
+    const minZ = floorBox.min.z + halfD;
+    const maxZ = floorBox.max.z - halfD;
+    
+    return new THREE.Vector3(
+        Math.max(minX, Math.min(maxX, targetPos.x)),
+        targetPos.y,
+        Math.max(minZ, Math.min(maxZ, targetPos.z))
+    );
+  }
+
+  // Логика за ограничаване ВЪТРЕ в стаята
+  const raycasterDown = new THREE.Raycaster();
+  const rayOrigin = targetPos.clone();
+  rayOrigin.y = 50; 
+  raycasterDown.set(rayOrigin, new THREE.Vector3(0, -1, 0));
+
+  const intersects = raycasterDown.intersectObjects(floors, false);
+
+  if (intersects.length > 0) {
+    const floorMesh = intersects[0].object;
+    const floorBox = new THREE.Box3().setFromObject(floorMesh);
+    const objBox = new THREE.Box3().setFromObject(object);
+
+    const halfWidth = (objBox.max.x - objBox.min.x) / 2;
+    const halfDepth = (objBox.max.z - objBox.min.z) / 2;
+
+    const minX = floorBox.min.x + halfWidth;
+    const maxX = floorBox.max.x - halfWidth;
+    const minZ = floorBox.min.z + halfDepth;
+    const maxZ = floorBox.max.z - halfDepth;
+
+    const clampedX = Math.max(minX, Math.min(maxX, targetPos.x));
+    const clampedZ = Math.max(minZ, Math.min(maxZ, targetPos.z));
+
+    return new THREE.Vector3(clampedX, targetPos.y, clampedZ);
+  }
+
+  return targetPos;
+}
+
+/* -------------------------
+   Drag Existing Objects
+------------------------- */
+const DRAG_PLANE_NORMAL = new THREE.Vector3(0, 1, 0);
+const GRID_SNAP = { enabled: false, size: 0.1 };
+let dragging = false;
+let dragObject = null;
+let dragOffset = new THREE.Vector3();
+const dragPlane = new THREE.Plane();
+const intersectionPoint = new THREE.Vector3();
+const tempVec = new THREE.Vector3();
+const tempVec2 = new THREE.Vector3();
+dragPlane.normal.copy(DRAG_PLANE_NORMAL);
+
 function firstIntersectableObjectFromPointer(clientX, clientY) {
   const rect = renderer.domElement.getBoundingClientRect();
   const x = ((clientX - rect.left) / rect.width) * 2 - 1;
@@ -208,101 +265,42 @@ function firstIntersectableObjectFromPointer(clientX, clientY) {
   return intersects.length ? intersects[0] : null;
 }
 
-// ------------------ Drag existing objects ------------------
-const DRAG_PLANE_NORMAL = new THREE.Vector3(0, 1, 0);
-const GRID_SNAP = { enabled: false, size: 0.1 };
-let dragging = false;
-let dragObject = null;
-let dragOffset = new THREE.Vector3();
-const dragPlane = new THREE.Plane();
-const intersectionPoint = new THREE.Vector3();
-const tmpA = new THREE.Vector3();
-const tmpB = new THREE.Vector3();
-dragPlane.normal.copy(DRAG_PLANE_NORMAL);
-
 function onPointerDownForDrag(e) {
   if (e.button !== undefined && e.button !== 0) return;
   const hit = firstIntersectableObjectFromPointer(e.clientX, e.clientY);
   if (!hit) { clearSelection(); return; }
+  
   const rawPicked = hit.object;
   const root = findRootForSelection(rawPicked);
   if (root.name === 'floor' || rawPicked.name === 'floor') { clearSelection(); return; }
+  
   dragging = true;
   dragObject = root;
   controls.enabled = false;
+  
   const objWorldPos = getWorldPosition(dragObject, tempVec);
   dragPlane.setFromNormalAndCoplanarPoint(DRAG_PLANE_NORMAL, objWorldPos);
+  
   const rect = renderer.domElement.getBoundingClientRect();
   const ndc = { x: ((e.clientX - rect.left) / rect.width) * 2 - 1, y: -((e.clientY - rect.top) / rect.height) * 2 + 1 };
   raycaster.setFromCamera(ndc, activeCamera);
   raycaster.ray.intersectPlane(dragPlane, intersectionPoint);
+  
   dragOffset.copy(objWorldPos).sub(intersectionPoint);
-  if (selectedObjects.length == 0) selectedObjects.push(dragObject);
+  
+  // Selection logic
+  if (selectedObjects.length === 0) selectedObjects.push(dragObject);
   else selectedObjects[0] = dragObject;
-  const box = new THREE.Box3().setFromObject(dragObject);
-  const size = new THREE.Vector3();
-  box.getSize(size);
-  updateToolbarPosition(); 
-  updateProps(root.name, `width: ${size.x.toFixed(2)}, height: ${size.y.toFixed(2)}, depth: ${size.z.toFixed(2)}`);
   activeOutlinePass.selectedObjects = selectedObjects;
+
+  const box = new THREE.Box3().setFromObject(dragObject);
+  const size = new THREE.Vector3(); box.getSize(size);
+  
+  updateToolbarPosition();
+  // Legacy props update if needed
+  updateProps(root.name, `width: ${size.x.toFixed(2)}, height: ${size.y.toFixed(2)}, depth: ${size.z.toFixed(2)}`);
+  
   e.preventDefault();
-}
-// Търси всички подове в сцената
-function getAllFloors() {
-  const floors = [];
-  scene.traverse((child) => {
-    // Проверяваме дали обектът е маркиран като под в userData (виж createRoom функцията)
-    if (child.userData && child.userData.filename === 'custom_floor') {
-      floors.push(child);
-    }
-  });
-  return floors;
-}
-
-// Ограничава позицията спрямо намерения под
-function constrainPositionToFloors(targetPos, object) {
-  const floors = getAllFloors();
-  if (floors.length === 0) return targetPos; // Няма стаи, движим свободно
-
-  // 1. Пускаме лъч от високо надолу към позицията, където искаме да отидем
-  const raycasterDown = new THREE.Raycaster();
-  const rayOrigin = targetPos.clone();
-  rayOrigin.y = 50; // Вдигаме високо
-  raycasterDown.set(rayOrigin, new THREE.Vector3(0, -1, 0)); // Сочи надолу
-
-  // 2. Проверяваме дали улучваме някой под
-  const intersects = raycasterDown.intersectObjects(floors, false);
-
-  if (intersects.length > 0) {
-    const floorMesh = intersects[0].object;
-    
-    // 3. Взимаме границите на ТОЗИ конкретен под
-    const floorBox = new THREE.Box3().setFromObject(floorMesh);
-    const objBox = new THREE.Box3().setFromObject(object);
-
-    // Изчисляваме размерите на обекта, за да не излиза половината навън
-    const objWidth = objBox.max.x - objBox.min.x;
-    const objDepth = objBox.max.z - objBox.min.z;
-
-    const halfWidth = objWidth / 2;
-    const halfDepth = objDepth / 2;
-
-    // 4. Математика за ограничаване (Clamp)
-    // Пода е min/max. Обектът трябва да е между (min + half) и (max - half)
-    const minX = floorBox.min.x + halfWidth;
-    const maxX = floorBox.max.x - halfWidth;
-    const minZ = floorBox.min.z + halfDepth;
-    const maxZ = floorBox.max.z - halfDepth;
-
-    const clampedX = Math.max(minX, Math.min(maxX, targetPos.x));
-    const clampedZ = Math.max(minZ, Math.min(maxZ, targetPos.z));
-
-    return new THREE.Vector3(clampedX, targetPos.y, clampedZ);
-  }
-
-  // Ако сме във "въздуха" (извън стая), връщаме оригиналната позиция 
-  // или може да върнете `object.position` ако искате да не може да излиза от стаята изобщо.
-  return targetPos;
 }
 
 function onPointerMoveForDrag(e) {
@@ -313,9 +311,8 @@ function onPointerMoveForDrag(e) {
   raycaster.setFromCamera(ndc, activeCamera);
   if (!raycaster.ray.intersectPlane(dragPlane, intersectionPoint)) return;
 
-  const targetWorld = tempVec2.copy(intersectionPoint).add(dragOffset);
+  let targetWorld = tempVec2.copy(intersectionPoint).add(dragOffset);
   const currentWorld = getWorldPosition(dragObject, tempVec);
-
   targetWorld.y = currentWorld.y;
 
   if (GRID_SNAP.enabled && GRID_SNAP.size > 0) {
@@ -324,21 +321,9 @@ function onPointerMoveForDrag(e) {
     targetWorld.y = currentWorld.y;
   }
 
-  const floorBox = new THREE.Box3().setFromObject(grid);
-  const objBox = new THREE.Box3().setFromObject(dragObject);
-  const desiredDelta = new THREE.Vector3().subVectors(targetWorld, currentWorld);
-  const minAllowedDeltaX = floorBox.min.x - objBox.min.x;
-  const maxAllowedDeltaX = floorBox.max.x - objBox.max.x;
-  const minAllowedDeltaZ = floorBox.min.z - objBox.min.z;
-  const maxAllowedDeltaZ = floorBox.max.z - objBox.max.z;
-
-  desiredDelta.x = Math.max(minAllowedDeltaX, Math.min(maxAllowedDeltaX, desiredDelta.x));
-  desiredDelta.z = Math.max(minAllowedDeltaZ, Math.min(maxAllowedDeltaZ, desiredDelta.z));
-
-  const adjustedTargetWorld = tempVec2.copy(currentWorld).add(desiredDelta);
-  adjustedTargetWorld.y = targetWorld.y;
-
-  setObjectWorldPosition(dragObject, adjustedTargetWorld);
+  // --- ВАЖНО: Прилагане на логиката за стая / ограничение ---
+  const constrainedPosition = constrainPositionToFloors(targetWorld, dragObject);
+  setObjectWorldPosition(dragObject, constrainedPosition);
 
   e.preventDefault();
 }
@@ -347,128 +332,74 @@ function onPointerUpForDrag(e) {
   if (dragging) {
     try { renderer.domElement.releasePointerCapture(e.pointerId); } catch (_) { }
     controls.enabled = true;
-    updateProps(
-      dragObject.name || 'Object',
-      `w:${20} h:${40} d:${11}`
-    );
+    updateLayoutEntryFromObject(dragObject);
+    saveLayoutDebounced();
+    
+    const box = new THREE.Box3().setFromObject(dragObject);
+    const size = new THREE.Vector3(); box.getSize(size);
+    updateProps(dragObject.name, `w:${size.x.toFixed(2)} h:${size.y.toFixed(2)} d:${size.z.toFixed(2)}`);
+    
     dragging = false;
     dragObject = null;
   }
 }
 
-renderer.domElement.addEventListener('pointerdown', onPointerDownForDrag, { passive: false });
-window.addEventListener('pointermove', onPointerMoveForDrag, { passive: false });
-window.addEventListener('pointerup', onPointerUpForDrag, { passive: false });
-
 /* -------------------------
-   Drag-from-menu logic (async)
-   - loads GLTF (cached)
-   - creates preview (transparent) and final (opaque) clones
-   - grounds model bottom to floor
-   - finalizes drop when pointer released (even if model loaded later)
+   Drag from Menu (Async)
 ------------------------- */
-
 const gltfLoader = new GLTFLoader();
-const gltfCache = new Map(); // cache loaded GLTFs by URL
-
-// utility to load GLTF (async/await) with caching
-async function loadGLTF(url) {
-  if (gltfCache.has(url)) {
-    return gltfCache.get(url);
-  }
-  const promise = new Promise((resolve, reject) => {
-    gltfLoader.load(url, resolve, undefined, reject);
-  });
-  gltfCache.set(url, promise);
-  return promise;
-}
-
-// deep clone helper for scenes (use .clone(true) for geometry; materials will be replaced/cloned)
-function deepCloneScene(sceneObj) {
-  return sceneObj.clone(true);
-}
-
+const gltfCache = new Map();
 let draggingFromMenu = false;
-let previewObject = null; // preview shown while dragging
-let finalObject = null; // final object to add to scene
+let previewObject = null;
+let finalObject = null;
 let draggedItem = null;
 let finalizeRequested = false;
 let finalizeDropPosition = null;
 
-/* Cancel any in-progress menu drag (used for ESC or cleanup) */
+async function loadGLTF(url) {
+  if (gltfCache.has(url)) return gltfCache.get(url);
+  const promise = new Promise((resolve, reject) => gltfLoader.load(url, resolve, undefined, reject));
+  gltfCache.set(url, promise);
+  return promise;
+}
+
+function deepCloneScene(sceneObj) { return sceneObj.clone(true); }
+
 function cancelMenuDragIfAny() {
   if (!draggingFromMenu) return;
   draggingFromMenu = false;
   finalizeRequested = false;
   finalizeDropPosition = null;
   draggedItem = null;
-  // remove preview
-  if (previewObject && previewObject.parent) {
-    previewObject.parent.remove(previewObject);
-  }
+  if (previewObject && previewObject.parent) previewObject.parent.remove(previewObject);
   previewObject = null;
   finalObject = null;
-  controls && (controls.enabled = true);
+  if (controls) controls.enabled = true;
   window.removeEventListener('pointermove', onMenuDragMove);
   window.removeEventListener('pointerup', onMenuDragEnd);
 }
 
-/* Helper: clone materials for a mesh and make preview/final materials distinct */
 function makePreviewMaterials(node) {
   if (!node.isMesh || !node.material) return;
-  if (Array.isArray(node.material)) {
-    node.material = node.material.map(m => {
-      const cm = m.clone();
-      cm.transparent = true;
-      cm.opacity = 0.45;
-      return cm;
-    });
-  } else {
-    const cm = node.material.clone();
-    cm.transparent = true;
-    cm.opacity = 0.45;
-    node.material = cm;
-  }
+  const apply = (m) => { const cm = m.clone(); cm.transparent = true; cm.opacity = 0.45; return cm; };
+  node.material = Array.isArray(node.material) ? node.material.map(apply) : apply(node.material);
 }
 
 function makeFinalMaterials(node) {
   if (!node.isMesh || !node.material) return;
-  if (Array.isArray(node.material)) {
-    node.material = node.material.map(m => {
-      const cm = m.clone();
-      cm.transparent = false;
-      cm.opacity = 1;
-      return cm;
-    });
-  } else {
-    const cm = node.material.clone();
-    cm.transparent = false;
-    cm.opacity = 1;
-    node.material = cm;
-  }
+  const apply = (m) => { const cm = m.clone(); cm.transparent = false; cm.opacity = 1; return cm; };
+  node.material = Array.isArray(node.material) ? node.material.map(apply) : apply(node.material);
 }
 
-// ground an object so its bottom sits at y=0
-function groundObjectToFloor(obj) {
-  const box = new THREE.Box3().setFromObject(obj);
-  obj.position.y -= (box.min.y || 0);
-}
-
-/* Start drag from menu (exposed to parent) */
 async function startDragFromMenu(item) {
   if (!item) return;
   cancelMenuDragIfAny();
-
   draggingFromMenu = true;
   draggedItem = item;
-  finalizeRequested = false;
-  finalizeDropPosition = null;
-
-  // disable orbit controls while dragging
+  
   if (controls) controls.enabled = false;
   dragPlane.setFromNormalAndCoplanarPoint(DRAG_PLANE_NORMAL, new THREE.Vector3(0, 0, 0));
 
-  // start loading model async
   const url = `/src/models/${draggedItem.filename}.glb`;
   let gltf;
   try {
@@ -477,7 +408,7 @@ async function startDragFromMenu(item) {
     window.addEventListener('pointerup', onMenuDragEnd, { passive: false });
     gltf = await gltfPromise;
   } catch (err) {
-    alert('Failed to load model for drag:', err);
+    alert('Failed to load model');
     cancelMenuDragIfAny();
     return;
   }
@@ -485,32 +416,16 @@ async function startDragFromMenu(item) {
   finalObject = deepCloneScene(gltf.scene);
   previewObject = deepCloneScene(gltf.scene);
 
-  // clone materials for final and preview (so they're independent)
-  finalObject.traverse((n) => {
-    if (n.isMesh) makeFinalMaterials(n);
-  });
-  previewObject.traverse((n) => {
-    if (n.isMesh) makePreviewMaterials(n);
-  });
+  finalObject.traverse(n => { if (n.isMesh) makeFinalMaterials(n); });
+  previewObject.traverse(n => { if (n.isMesh) makePreviewMaterials(n); });
 
-  // ground both clones (use final for measuring)
-  try {
-    groundObjectToFloor(finalObject);
-    // apply the same shift to preview so they align
-    const finalBox = new THREE.Box3().setFromObject(finalObject);
-    const finalMinY = finalBox.min.y || 0;
-    previewObject.position.y -= finalMinY;
-  } catch (e) {
-    console.warn('Grounding failed:', e);
-  }
+  const box = new THREE.Box3().setFromObject(finalObject);
+  const offset = box.min.y || 0;
+  finalObject.position.y -= offset;
+  previewObject.position.y -= offset;
 
-  // add preview to scene immediately (visible when pointer moves over canvas)
   scene.add(previewObject);
-
-  // If user already released pointer before model loaded (finalizeRequested), finalize now
-  if (finalizeRequested) {
-    finalizeDropAt(finalizeDropPosition || intersectionPoint.clone());
-  }
+  if (finalizeRequested) finalizeDropAt(finalizeDropPosition || intersectionPoint.clone());
 }
 
 function onMenuDragMove(e) {
@@ -519,6 +434,7 @@ function onMenuDragMove(e) {
   const rect = renderer.domElement.getBoundingClientRect();
   const ndc = { x: ((e.clientX - rect.left) / rect.width) * 2 - 1, y: -((e.clientY - rect.top) / rect.height) * 2 + 1 };
   raycaster.setFromCamera(ndc, activeCamera);
+  
   if (!raycaster.ray.intersectPlane(dragPlane, intersectionPoint)) {
     if (previewObject) previewObject.visible = false;
     return;
@@ -527,69 +443,11 @@ function onMenuDragMove(e) {
   if (previewObject) {
     previewObject.visible = true;
     const pos = intersectionPoint.clone();
-    const bb = new THREE.Box3().setFromObject(previewObject);
-    const size = new THREE.Vector3(); bb.getSize(size);
-    previewObject.position.set(pos.x, pos.y + size.y / 2, pos.z);
+    
+    // Ограничаваме Preview-то също
+    const constrainedPos = constrainPositionToFloors(pos, previewObject);
+    previewObject.position.set(constrainedPos.x, previewObject.position.y, constrainedPos.z);
   }
-}
-
-function finalizeDropAt(posWorld) {
-  if (!finalObject) {
-    // final model not yet ready: remember the request, will finalize in loader success
-    finalizeRequested = true;
-    finalizeDropPosition = posWorld ? posWorld.clone() : null;
-    return;
-  }
-
-  // position finalObject (finalObject has been grounded so its bottom is at y=0)
-  if (posWorld) {
-    finalObject.position.copy(posWorld);
-    // ensure bottom sits on floor: use bounding box height to set Y
-    const bb = new THREE.Box3().setFromObject(finalObject);
-    const size = new THREE.Vector3();
-    bb.getSize(size);
-    // finalObject.position.y = posWorld.y + size.y / 2;
-  }
-  finalObject.name = draggedItem.name;
-  finalObject.userData = { filename: draggedItem.filename };
-  scene.add(finalObject);
-  addToLayoutData(finalObject);
-
-  // select it
-  selectedObjects.length = 0;
-  selectedObjects.push(finalObject);
-  activeOutlinePass.selectedObjects = selectedObjects;
-
-  // update props panel
-  const box = new THREE.Box3().setFromObject(finalObject);
-  const size = new THREE.Vector3();
-  box.getSize(size);
-  updateProps(finalObject.name || draggedItem?.name || 'Furniture', `w:${size.x.toFixed(2)} h:${size.y.toFixed(2)} d:${size.z.toFixed(2)}`);
-
-  // remove preview safely
-  if (previewObject && previewObject.parent) {
-    previewObject.parent.remove(previewObject);
-  }
-
-  // dispose preview materials
-  previewObject && previewObject.traverse((n) => {
-    if (n.isMesh) {
-      if (Array.isArray(n.material)) {
-        n.material.forEach(mat => mat.dispose && mat.dispose());
-      } else if (n.material) {
-        n.material.dispose && n.material.dispose();
-      }
-    }
-  });
-
-  // reset state
-  previewObject = null;
-  finalObject = null;
-  finalizeRequested = false;
-  finalizeDropPosition = null;
-  draggingFromMenu = false;
-  draggedItem = null;
-  controls && (controls.enabled = true);
 }
 
 function onMenuDragEnd(e) {
@@ -603,419 +461,162 @@ function onMenuDragEnd(e) {
     dropPos = intersectionPoint.clone();
   }
 
-  if (finalObject) {
-    finalizeDropAt(dropPos);
-  } else {
-    // not ready yet -> schedule
+  if (finalObject) finalizeDropAt(dropPos);
+  else {
     finalizeRequested = true;
     finalizeDropPosition = dropPos;
   }
 
-  // cleanup listeners
   window.removeEventListener('pointermove', onMenuDragMove);
   window.removeEventListener('pointerup', onMenuDragEnd);
 }
 
-/* -------------------------
-   Utilities / UI props panel (your existing code)
-------------------------- */
-var propsMenu, selectedName, selectedCoords;
-let rotateInput, rotateLeftBtn, rotateRightBtn;
+function finalizeDropAt(posWorld) {
+  if (!finalObject) return;
+  
+  if (posWorld) {
+      // Ограничаваме финалната позиция
+      const constrained = constrainPositionToFloors(posWorld, finalObject);
+      finalObject.position.set(constrained.x, finalObject.position.y, constrained.z);
+  }
+  
+  finalObject.name = draggedItem.name;
+  finalObject.userData = { filename: draggedItem.filename };
+  scene.add(finalObject);
+  addToLayoutData(finalObject);
 
-function initPropsMenu() {
-  propsMenu = document.createElement('div');
-  propsMenu.id = 'props-menu';
-  propsMenu.style.touchAction = 'none';
-  propsMenu.style.userSelect = 'none';
+  // Auto-select dropped object
+  selectedObjects.length = 0;
+  selectedObjects.push(finalObject);
+  activeOutlinePass.selectedObjects = selectedObjects;
+  updateToolbarPosition();
 
-  selectedName = document.createElement('p');
-  selectedCoords = document.createElement('p');
-  selectedName.id = 'props-selected-name';
-  selectedCoords.id = 'props-selected-coords';
-
-  propsMenu.appendChild(selectedName);
-  propsMenu.appendChild(selectedCoords);
-
-  // --- rotate UI block ---
-  const rotateContainer = document.createElement('div');
-  rotateContainer.id = 'props-rotate';
-  rotateContainer.style.display = 'flex';
-  rotateContainer.style.gap = '6px';
-  rotateContainer.style.alignItems = 'center';
-  rotateContainer.style.marginTop = '8px';
-
-  // left rotate (-15deg)
-  rotateLeftBtn = document.createElement('button');
-  rotateLeftBtn.type = 'button';
-  rotateLeftBtn.innerText = '⟲';
-  rotateLeftBtn.title = 'Rotate -15°';
-  rotateLeftBtn.addEventListener('click', () => rotateSelectedDelta(-15));
-
-  // right rotate (+15deg)
-  rotateRightBtn = document.createElement('button');
-  rotateRightBtn.type = 'button';
-  rotateRightBtn.innerText = '⟳';
-  rotateRightBtn.title = 'Rotate +15°';
-  rotateRightBtn.addEventListener('click', () => rotateSelectedDelta(15));
-
-  // numeric input (degrees)
-  rotateInput = document.createElement('input');
-  rotateInput.type = 'number';
-  rotateInput.step = '1';
-  rotateInput.min = '-360';
-  rotateInput.max = '360';
-  rotateInput.value = '0';
-  rotateInput.style.width = '64px';
-  rotateInput.title = 'Rotation (degrees)';
-  rotateInput.addEventListener('change', onRotateInputChange);
-  rotateInput.addEventListener('blur', onRotateInputChange);
-  rotateInput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') onRotateInputChange(); });
-
-  rotateContainer.appendChild(rotateLeftBtn);
-  rotateContainer.appendChild(rotateRightBtn);
-  rotateContainer.appendChild(rotateInput);
-
-  propsMenu.appendChild(rotateContainer);
-  // --- end rotate UI ---
-
-
-
-  const appEl = document.getElementById('app') || document.body;
-  appEl.appendChild(propsMenu);
-
+  // Cleanup
+  if (previewObject && previewObject.parent) previewObject.parent.remove(previewObject);
+  previewObject = null;
+  finalObject = null;
+  draggingFromMenu = false;
+  if (controls) controls.enabled = true;
 }
 
-initPropsMenu();
-
+/* -------------------------
+   Layout Data & Persistence
+------------------------- */
 function addToLayoutData(object3D) {
   const entry = {
     id: uuidv4(),
     name: object3D.name,
     filename: object3D.userData.filename,
-    position: {
-      x: object3D.position.x,
-      y: object3D.position.y,
-      z: object3D.position.z
-    },
-    rotation: {
-      x: object3D.rotation.x,
-      y: object3D.rotation.y,
-      z: object3D.rotation.z
-    },
-    scale: {
-      x: object3D.scale.x,
-      y: object3D.scale.y,
-      z: object3D.scale.z
-    }
+    position: { x: object3D.position.x, y: object3D.position.y, z: object3D.position.z },
+    rotation: { x: object3D.rotation.x, y: object3D.rotation.y, z: object3D.rotation.z },
+    scale: { x: object3D.scale.x, y: object3D.scale.y, z: object3D.scale.z }
   };
-
+  object3D.userData.id = entry.id; // Sync ID
   layoutData.value.push(entry);
   saveLayoutDebounced();
 }
-const isSavingLayout = ref(false);
+
+function updateLayoutEntryFromObject(object3D) {
+  if (!object3D || !object3D.userData) return;
+  const id = object3D.userData.id || object3D.userData._id; if (!id) return;
+  const entry = layoutData.value.find(x => x.id === id); if (!entry) return;
+  entry.position = { ...object3D.position };
+  entry.rotation = { x: object3D.rotation.x, y: object3D.rotation.y, z: object3D.rotation.z };
+  entry.scale = { ...object3D.scale };
+}
 
 async function saveLayout() {
   try {
     isSavingLayout.value = true;
-    console.log('Saving layout...', projectId);
-    await updateProjectLayout(
-      projectId,
-      layoutData.value
-    );
-
+    await updateProjectLayout(projectId, layoutData.value);
   } catch (err) {
-    alert('Failed to save layout', err);
+    console.error('Failed to save layout', err);
   } finally {
     isSavingLayout.value = false;
   }
 }
 
-
-function updateProps(name, coords) {
-  // original behavior
-  try {
-    propsMenu.style.width = '220px';
-    propsMenu.style.opacity = 1;
-    if (selectedName) selectedName.innerHTML = name || '';
-    if (selectedCoords) selectedCoords.innerHTML = coords || '';
-  } catch (e) {
-    // ignore if propsMenu missing
+/* -------------------------
+   Toolbar & Selection Actions
+------------------------- */
+function clearSelection() {
+  selectedObjects.length = 0;
+  activeOutlinePass.selectedObjects = selectedObjects;
+  isToolbarVisible.value = false;
+  
+  if (propsMenu) {
+    propsMenu.style.opacity = 0;
+    propsMenu.style.width = '0';
   }
-
-  // sync rotate UI to currently selected object
-  if (!rotateInput) return; // UI not created yet
-  const obj = selectedObjects[0];
-  if (!obj) {
-    // no selection → disable / clear input
+  // Reset legacy UI
+  if (rotateInput) {
     rotateInput.value = '0';
-    rotateLeftBtn.disabled = true;
-    rotateRightBtn.disabled = true;
-  } else {
-    rotateLeftBtn.disabled = false;
-    rotateRightBtn.disabled = false;
-    refreshRotationUI(obj);
+    if(rotateLeftBtn) rotateLeftBtn.disabled = true;
+    if(rotateRightBtn) rotateRightBtn.disabled = true;
   }
 }
-/* -------------------------Rotation UI logic------------------------- */
-function degToRad(d) { return d * Math.PI / 180; }
-function radToDeg(r) { return r * 180 / Math.PI; }
 
-function refreshRotationUI(obj) {
-  if (!rotateInput || !obj) return;
-  const deg = Math.round((radToDeg(obj.rotation.y) + 360) % 360);
-  rotateInput.value = String(deg);
-}
-
-function rotateSelectedDelta(deltaDeg) {
-  const obj = selectedObjects[0];
-  if (!obj) return;
-  obj.rotation.y += degToRad(deltaDeg);
-  refreshRotationUI(obj);
-  updateLayoutEntryFromObject(obj);
-  saveLayoutDebounced();
-}
-
-function onRotateInputChange() {
-  const obj = selectedObjects[0];
-  if (!obj || !rotateInput) return;
-  const num = Number(rotateInput.value);
-  if (isNaN(num)) return;
-  obj.rotation.y = degToRad(num);
-  refreshRotationUI(obj);
-  updateLayoutEntryFromObject(obj);
-  saveLayoutDebounced();
-}
-
-
-/** update layoutData entry for the object (by userData.id) */
-function updateLayoutEntryFromObject(object3D) {
-  if (!object3D || !object3D.userData) return;
-  const id = object3D.userData.id || object3D.userData._id; if (!id) return;
-  const entry = layoutData.value.find(x => x.id === id); if (!entry) return;
-  entry.position.x = object3D.position.x; entry.position.y = object3D.position.y; entry.position.z = object3D.position.z;
-  entry.rotation.y = object3D.rotation.y;
-  entry.scale.x = object3D.scale.x; entry.scale.y = object3D.scale.y; entry.scale.z = object3D.scale.z;
-}
-
-
-/* -------------------------
-   Window resize handling
-------------------------- */
-function onWindowResize() {
-  renderWidth = window.innerWidth;
-  renderHeight = window.innerHeight * 15 / 16;
-  const w = renderWidth;
-  const h = renderHeight;
-  perspectiveCamera.aspect = w / h;
-  perspectiveCamera.updateProjectionMatrix();
-  const aspectNow = w / h;
-  orthoCamera.left = (-frustumSize * aspectNow) / 2;
-  orthoCamera.right = (frustumSize * aspectNow) / 2;
-  orthoCamera.top = frustumSize / 2;
-  orthoCamera.bottom = -frustumSize / 2;
-  orthoCamera.updateProjectionMatrix();
-  renderer.setPixelRatio(window.devicePixelRatio || 1);
-  renderer.setSize(w, h);
-  composer.setSize(w, h);
-  if (typeof outlinePass3D.setSize === 'function') outlinePass3D.setSize(w, h);
-  if (typeof outlinePass2D.setSize === 'function') outlinePass2D.setSize(w, h);
-}
-
-import { useTheme } from '../composables/useTheme';
-
-const { theme } = useTheme();
-
-watch(theme, (t) => {
-  scene.background = new THREE.Color(
-    t === 'dark' ? 0x303541 : 0xb5bbcf
-  );
-});
-
-
-/* -------------------------
-   Lifecycle
-------------------------- */
-onMounted(() => {
-  // append renderer canvas
-  const container = document.getElementById('edit-project-container');
-  if (container) container.appendChild(renderer.domElement);
-  composer.setSize(renderWidth, renderHeight);
-  if (typeof outlinePass3D.setSize === 'function') outlinePass3D.setSize(renderWidth, renderHeight);
-  if (typeof outlinePass2D.setSize === 'function') outlinePass2D.setSize(renderWidth, renderHeight);
-
-  window.addEventListener('resize', onWindowResize, { passive: true });
-});
-
-onBeforeUnmount(() => {
-  // remove listeners
-  window.removeEventListener('resize', onWindowResize);
-  window.removeEventListener('keydown', onKeyDown);
-  try { renderer.domElement.removeEventListener('pointerdown', onPointerDownForDrag); } catch (e) { }
-  window.removeEventListener('pointermove', onPointerMoveForDrag);
-  window.removeEventListener('pointerup', onPointerUpForDrag);
-  // remove any in-progress menu drag listeners
-  cancelMenuDragIfAny();
-
-  // remove renderer canvas
-  if (renderer && renderer.domElement && renderer.domElement.parentNode) {
-    renderer.domElement.parentNode.removeChild(renderer.domElement);
-  }
-
-  // dispose resources
-  if (controls) controls.dispose();
-});
-
-/* -------------------------
-   Camera switching helpers
-------------------------- */
-let currMode = 3;
-function bindControllerToCamera(cam) {
-  if (controls) {
-    try { controls.dispose(); } catch (_) { }
-  }
-  controls = new OrbitControls(cam, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.08;
-  controls.update();
-}
-function switchTo2D() {
-  if (currMode === 2) return;
-  currMode = 2;
-  dir.intensity = 0;
-  activeCamera = orthoCamera;
-  activeOutlinePass = outlinePass2D;
-  bindControllerToCamera(activeCamera);
-  renderPass.camera = activeCamera;
-  composer.removePass(outlinePass3D);
-  composer.addPass(outlinePass2D);
-  controls.enableRotate = false;
-  activeCamera.updateProjectionMatrix();
-}
-function switchTo3D() {
-  if (currMode === 3) return;
-  currMode = 3;
-  dir.intensity = 1;
-  activeCamera = perspectiveCamera;
-  activeOutlinePass = outlinePass3D;
-  bindControllerToCamera(activeCamera);
-  renderPass.camera = activeCamera;
-  composer.removePass(outlinePass2D);
-  composer.addPass(outlinePass3D);
-  controls.enableRotate = true;
-  activeCamera.updateProjectionMatrix();
-}
-
-// Импортирай новия компонент най-горе
-import SelectionToolbar from '../components/SelectionToolbar.vue';
-
-// --- Нови REFS за Toolbar-а ---
-const isToolbarVisible = ref(false);
-const toolbarPosition = reactive({ x: 0, y: 0 });
-
-// --- Функция за изчисляване на 2D позиция от 3D обект ---
 function updateToolbarPosition() {
   if (selectedObjects.length === 0) {
     isToolbarVisible.value = false;
     return;
   }
-  
   const obj = selectedObjects[0];
   if (!obj) return;
 
-  // 1. Намираме центъра на обекта в 3D света
   const box = new THREE.Box3().setFromObject(obj);
   const center = box.getCenter(new THREE.Vector3());
-  
-  // Опционално: вдигаме малко нагоре, за да е над обекта
-  center.y = box.max.y+3; 
+  center.y = box.max.y + 3; 
 
-  // 2. Проектираме 3D координатите към 2D екрана
   const vector = center.clone();
   vector.project(activeCamera);
 
-  // 3. Преобразуваме NDC (-1 до +1) към пиксели на екрана
   const halfWidth = window.innerWidth / 2;
   const halfHeight = window.innerHeight / 2;
-
   toolbarPosition.x = (vector.x * halfWidth) + halfWidth;
   toolbarPosition.y = -(vector.y * halfHeight) + halfHeight;
-  
   isToolbarVisible.value = true;
 }
-
-function animate() {
-  fps++;
-  if (fps & 1) return;
-  if (controls) controls.update();
-  
-  // Добави това:
-  if (selectedObjects.length > 0) {
-    updateToolbarPosition();
-  }
-
-  composer.render();
-}
-
-renderer.setAnimationLoop(animate);
-
-// В `clearSelection()` добави:
-function clearSelection() {
-  selectedObjects.length = 0;
-  activeOutlinePass.selectedObjects = selectedObjects;
-  isToolbarVisible.value = false; 
-    selectedObjects.length = 0;
-  activeOutlinePass.selectedObjects = selectedObjects;
-  if (propsMenu) {
-    propsMenu.style.opacity = 0;
-    propsMenu.style.width = '0';
-  }
-}
-
 
 function handleDuplicate() {
   const original = selectedObjects[0];
   if (!original) return;
-
   const clone = deepCloneScene(original);
-  
-  // Преместваме клонинга малко встрани, за да се вижда
   clone.position.x += 2;
   clone.position.z += 2;
-  
-  // Важно: Ново уникално ID
   clone.userData.id = uuidv4(); 
-  // Запазваме оригиналния filename за layout-а
   clone.userData.filename = original.userData.filename;
+  
+  // Ограничаваме клонинга
+  const constrained = constrainPositionToFloors(clone.position, clone);
+  clone.position.copy(constrained);
 
   scene.add(clone);
-  addToLayoutData(clone); // Добавяне в JSON структурата
-
-  // Селектираме новия обект
+  addToLayoutData(clone);
+  
   selectedObjects[0] = clone;
   activeOutlinePass.selectedObjects = selectedObjects;
   updateToolbarPosition();
 }
 
 function handleToolbarRotate(angleDeg) {
-    // Използваме вече съществуващата функция
-    rotateSelectedDelta(angleDeg);
+  const obj = selectedObjects[0];
+  if (!obj) return;
+  obj.rotation.y += (angleDeg * Math.PI / 180);
+  
+  updateLayoutEntryFromObject(obj);
+  saveLayoutDebounced();
+  
+  // Update legacy UI if open
+  if (rotateInput) rotateInput.value = String(Math.round((obj.rotation.y * 180 / Math.PI + 360) % 360));
 }
 
 function handleFlip(axis) {
   const obj = selectedObjects[0];
   if (!obj) return;
-
-  // Обръщането става чрез умножение на скалата по -1
-  if (axis === 'x') {
-    obj.scale.x *= -1;
-  } else if (axis === 'z') {
-    // Приемаме Z за другата хоризонтална ос
-    obj.scale.z *= -1;
-  }
-  
-  // Трябва да обновим матрицата, за да се отрази промяната
+  if (axis === 'x') obj.scale.x *= -1;
+  else if (axis === 'z') obj.scale.z *= -1;
   obj.updateMatrix();
-  
   updateLayoutEntryFromObject(obj);
   saveLayoutDebounced();
 }
@@ -1023,17 +624,10 @@ function handleFlip(axis) {
 function handleDelete() {
   const obj = selectedObjects[0];
   if (!obj) return;
-
-  // 1. Премахване от сцената
   scene.remove(obj);
-
-  // 2. Премахване от layoutData (JSON)
   const id = obj.userData.id || obj.userData._id;
-  if (id) {
-    layoutData.value = layoutData.value.filter(item => item.id !== id);
-  }
-
-  // 3. Изчистване на ресурси (по желание, но добра практика)
+  if (id) layoutData.value = layoutData.value.filter(item => item.id !== id);
+  
   obj.traverse(child => {
     if (child.isMesh) {
       if (child.geometry) child.geometry.dispose();
@@ -1043,14 +637,128 @@ function handleDelete() {
       }
     }
   });
-
-  // 4. Деселектиране и запазване
   clearSelection();
   saveLayoutDebounced();
 }
 
-defineExpose({ startDragFromMenu });
+/* -------------------------
+   Camera & Window Logic
+------------------------- */
+function onWindowResize() {
+  renderWidth = window.innerWidth;
+  renderHeight = window.innerHeight * 15 / 16;
+  
+  perspectiveCamera.aspect = renderWidth / renderHeight;
+  perspectiveCamera.updateProjectionMatrix();
+  
+  const aspectNow = renderWidth / renderHeight;
+  orthoCamera.left = (-frustumSize * aspectNow) / 2;
+  orthoCamera.right = (frustumSize * aspectNow) / 2;
+  orthoCamera.top = frustumSize / 2;
+  orthoCamera.bottom = -frustumSize / 2;
+  orthoCamera.updateProjectionMatrix();
 
+  renderer.setSize(renderWidth, renderHeight);
+  composer.setSize(renderWidth, renderHeight);
+  if (outlinePass3D.setSize) outlinePass3D.setSize(renderWidth, renderHeight);
+  if (outlinePass2D.setSize) outlinePass2D.setSize(renderWidth, renderHeight);
+}
+
+function bindControllerToCamera(cam) {
+  if (controls) try { controls.dispose(); } catch (_) { }
+  controls = new OrbitControls(cam, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.update();
+}
+
+function switchTo2D() {
+  dir.intensity = 0;
+  activeCamera = orthoCamera;
+  activeOutlinePass = outlinePass2D;
+  bindControllerToCamera(activeCamera);
+  controls.enableRotate = false;
+  controls.reset(); 
+  activeCamera.position.set(0, 20, 0); 
+  activeCamera.lookAt(0,0,0);
+  
+  renderPass.camera = activeCamera;
+  composer.removePass(outlinePass3D);
+  composer.addPass(outlinePass2D);
+}
+
+function switchTo3D() {
+  dir.intensity = 1;
+  activeCamera = perspectiveCamera;
+  activeOutlinePass = outlinePass3D;
+  bindControllerToCamera(activeCamera);
+  controls.enableRotate = true;
+  
+  renderPass.camera = activeCamera;
+  composer.removePass(outlinePass2D);
+  composer.addPass(outlinePass3D);
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Escape' || e.key === 'Esc' || e.keyCode === 27) {
+    clearSelection();
+    cancelMenuDragIfAny();
+  }
+}
+
+/* -------------------------
+   Lifecycle
+------------------------- */
+let propsMenu, rotateInput, rotateLeftBtn, rotateRightBtn;
+
+function animate() {
+  if (controls) controls.update();
+  if (selectedObjects.length > 0) updateToolbarPosition();
+  composer.render();
+}
+
+const { theme } = useTheme();
+watch(theme, (t) => { scene.background = new THREE.Color(t === 'dark' ? 0x303541 : 0xb5bbcf); });
+
+onMounted(() => {
+  const container = document.getElementById('edit-project-container');
+  if (container) container.appendChild(renderer.domElement);
+  
+  initPropsMenu();
+
+  window.addEventListener('resize', onWindowResize, { passive: true });
+  window.addEventListener('keydown', onKeyDown);
+  renderer.domElement.addEventListener('pointerdown', onPointerDownForDrag, { passive: false });
+  window.addEventListener('pointermove', onPointerMoveForDrag, { passive: false });
+  window.addEventListener('pointerup', onPointerUpForDrag, { passive: false });
+  
+  renderer.setAnimationLoop(animate);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onWindowResize);
+  window.removeEventListener('keydown', onKeyDown);
+  window.removeEventListener('pointermove', onPointerMoveForDrag);
+  window.removeEventListener('pointerup', onPointerUpForDrag);
+  try { renderer.domElement.removeEventListener('pointerdown', onPointerDownForDrag); } catch (e) { }
+  
+  cancelMenuDragIfAny();
+  renderer.setAnimationLoop(null);
+  
+  if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
+  if (controls) controls.dispose();
+  if (propsMenu && propsMenu.parentNode) propsMenu.parentNode.removeChild(propsMenu);
+});
+
+/* Legacy Props Menu */
+function initPropsMenu() {
+  propsMenu = document.createElement('div');
+  propsMenu.id = 'props-menu';
+  document.body.appendChild(propsMenu);
+}
+function updateProps(name, info) { }
+
+defineExpose({ startDragFromMenu });
 </script>
 
 <style>

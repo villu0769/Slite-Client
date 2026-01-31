@@ -99,7 +99,7 @@ watch(name, (newValue, oldValue) => {
     } finally {
       isSaving.value = false;
     }
-  }, 800);
+  }, 1000);
 });
 
 </script>

@@ -23,7 +23,8 @@ const routes = [
   { path: '/register', component: RegisterPage },
   { path: '/unauthorized', component: UnauthorizedPage },
   { path: '/projects', component: ProjectsPage, beforeEnter: requireAuth },
-  { path: '/project/:id', component: EditProjectPage, beforeEnter: requireAuth },
+//  { path: '/project/:id', component: EditProjectPage, beforeEnter: requireAuth },
+  { path: '/project/:id', component: EditProjectPage },
 ]
 
 const router = createRouter({

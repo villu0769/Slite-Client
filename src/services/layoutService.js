@@ -9,7 +9,7 @@ export const loadLayout = async (layoutData, manager, maxHeight, scene, perspect
   if (!Array.isArray(layoutData) || layoutData.length === 0) return;
 
   const loader = getGLTFLoader(manager);
-
+ 
   await Promise.all(
     layoutData.map(async (item) => {
 
@@ -83,21 +83,12 @@ export const loadLayout = async (layoutData, manager, maxHeight, scene, perspect
         gltf.scene.position.y = item.position.y || 0;
         gltf.scene.position.z = item.position.z || 0;
         gltf.scene.rotation.y = item.rotation.y || 0;
-<<<<<<< HEAD
-
-        // Мащабиране (добавих го, защото често липсва)
-        if (item.scale) {
-          gltf.scene.scale.set(item.scale.x, item.scale.y, item.scale.z);
-        }
-
-=======
         if (item.scale) {
         gltf.scene.scale.set(item.scale.x, item.scale.y, item.scale.z);
       } else {
         // Дефолт, ако няма данни (за да не стане мащаб 0)
         gltf.scene.scale.set(1, 1, 1);
       }
->>>>>>> 5cf0d0d484205872545dc9fa35007a834c4b4ea5
         gltf.scene.name = item.name || item.filename;
         gltf.scene.userData = { id: item.id, filename: item.filename };
 

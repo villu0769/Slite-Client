@@ -1,259 +1,837 @@
 <template>
-  <div
-    v-if="isOpen"
-    class="floating-menu"
-    :style="menuStyle"
-    ref="menuEl"
-    role="dialog"
-    aria-label="Build Menu"
-  >
-    <div class="menu-header" @pointerdown.prevent="startDrag">
-      <div class="menu-title">
-        <button v-if="selectedCategory" class="icon-btn back-btn" @click="goBack" title="Back">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="19" y1="12" x2="5" y2="12"></line>
-            <polyline points="12 19 5 12 12 5"></polyline>
-          </svg>
-        </button>
-        <span>{{ selectedCategory ? currentCategoryLabel : 'Build Structure' }}</span>
-      </div>
-      
-      <div class="header-actions">
-        <button class="icon-btn close-btn" @click="emit('close')" aria-label="Close">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
+  <div id="edit-project-container">
+    <div id="bottom-menu">
+      <p @click="switchTo2D">2D</p>
+      <p @click="switchTo3D">3D</p>
     </div>
-
-    <div class="menu-body">
-      <transition :name="transitionName" mode="out-in">
-        
-        <div v-if="!selectedCategory" key="categories" class="category-list">
-          <button
-            v-for="cat in categories"
-            :key="cat.id"
-            class="category-btn"
-            @click="handleCategoryClick(cat)"
-            :disabled="cat.disabled"
-          >
-            <div class="cat-label-wrap">
-               <span class="cat-icon" v-html="cat.icon"></span>
-               {{ cat.name }}
-            </div>
-            
-            <svg v-if="cat.hasSubItems" class="chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="9 18 15 12 9 6"></polyline>
-            </svg>
-          </button>
-        </div>
-
-        <div v-else key="items" class="panel">
-          
-          <div class="items-header">
-            <span class="items-subtitle">
-              {{ selectedCategory === 'room' ? 'Set Dimensions' : `Select ${currentCategoryLabel} Type` }}
-            </span>
-          </div>
-          
-          <div v-if="selectedCategory === 'room'" class="room-form">
-            
-            <div class="input-group">
-              <label>Width (m)</label>
-              <input type="number" v-model.number="roomSize.width" min="1" step="0.5" />
-            </div>
-
-            <div class="input-group">
-              <label>Length (m)</label>
-              <input type="number" v-model.number="roomSize.length" min="1" step="0.5" />
-            </div>
-
-            <button class="create-btn" @click="handleCreateRoom">
-              Create Room
-            </button>
-            
-          </div>
-
-          <div v-else class="tools-grid">
-            <button 
-              v-for="item in visibleItems" 
-              :key="item.id"
-              class="tool-btn"
-              @click="handleToolClick(item.action)"
-            >
-              <div class="tool-icon" v-html="item.icon || defaultIcon"></div>
-              <span class="tool-name">{{ item.name }}</span>
-            </button>
-          </div>
-
-        </div>
-
-      </transition>
-    </div>
-    
-    </div>
+    <SelectionToolbar 
+      :visible="isToolbarVisible" 
+      :position="toolbarPosition" 
+      @duplicate="handleDuplicate"
+      @rotate="handleToolbarRotate" 
+      @flip="handleFlip" 
+      @delete="handleDelete" 
+    />
+  </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
+/* EditProject.vue: Final Version with Props Menu Restored */
 
-// --- PROPS & EMITS ---
+import { onMounted, onBeforeUnmount, ref, watch, reactive } from 'vue';
+import { useRoute } from 'vue-router';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { GammaCorrectionShader } from 'three/addons/shaders/GammaCorrectionShader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { v4 as uuidv4 } from 'uuid';
+import debounce from 'lodash.debounce';
+
+// Services & Components
+import { loadLayout, updateProjectLayout } from '../services/layoutService';
+import SelectionToolbar from '../components/SelectionToolbar.vue';
+import { useTheme } from '../composables/useTheme';
+
+/* -------------------------
+   Props & State
+------------------------- */
 const props = defineProps({
-  isOpen: { type: Boolean, required: true },
+  projectData: { type: Object, required: true }
 });
 
-const emit = defineEmits(['close', 'action']);
-const menuEl = ref(null);
+const route = useRoute();
+const projectId = route.params.id;
+const layoutData = ref(Array.isArray(props.projectData.layoutData) ? [...props.projectData.layoutData] : []);
 
-// --- DATA: Room Form State ---
-const roomSize = reactive({ width: 5, length: 4 });
+// Toolbar State
+const isToolbarVisible = ref(false);
+const toolbarPosition = reactive({ x: 0, y: 0 });
 
-// --- DATA: Categories & Items ---
-const defaultIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>';
+// Saving State
+const saveLayoutDebounced = debounce(saveLayout, 500);
+const isSavingLayout = ref(false);
 
-const categories = [
-  { 
-    id: 'room', 
-    name: 'Add Room', 
-    hasSubItems: true, // Променено на TRUE
-    // action: 'add-room', // Премахнато, защото вече отваря меню
-    icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M3 9h18"/></svg>' ,
-    disabled:false
-  },
-  { 
-    id: 'walls', 
-    name: 'Walls', 
-    hasSubItems: true,
-    icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 22h20M4 22V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v16"/></svg>' ,
-    disabled:true
-  },
-  { 
-    id: 'doors', 
-    name: 'Doors', 
-    hasSubItems: true,
-    icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22V6M6 22v-4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4M4 22h16"/></svg>' ,
-    disabled:true
-  },
-  { 
-    id: 'windows', 
-    name: 'Windows', 
-    hasSubItems: true,
-    icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg>' ,
-    disabled:true
+/* -------------------------
+   Scene Setup
+------------------------- */
+let renderWidth = window.innerWidth;
+let renderHeight = window.innerHeight - 56;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xb5bbcf);
+
+// Cameras
+const aspect = renderWidth / renderHeight;
+const perspectiveCamera = new THREE.PerspectiveCamera(75, aspect, 0.1, 10000);
+perspectiveCamera.position.set(0, 50, 50);
+
+const frustumSize = 25;
+const orthoCamera = new THREE.OrthographicCamera(
+  (frustumSize * aspect) / -2, (frustumSize * aspect) / 2,
+  frustumSize / 2, frustumSize / -2,
+  0.1, 10000
+);
+orthoCamera.position.set(0, 2, 0);
+
+let activeCamera = perspectiveCamera;
+
+// Renderer
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+if ('outputEncoding' in renderer) renderer.outputEncoding = THREE.sRGBEncoding;
+else if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setPixelRatio(window.devicePixelRatio || 1);
+renderer.setSize(renderWidth, renderHeight);
+renderer.domElement.style.touchAction = 'none';
+
+// Controls
+let controls = new OrbitControls(activeCamera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+// Lights
+const light = new THREE.AmbientLight(0xFFFFFF, 1);
+const light2 = new THREE.AmbientLight(0xFFFFFF, 1);
+const dir = new THREE.DirectionalLight(0xffffff, 1);
+dir.position.set(10, 10, 10);
+scene.add(light, light2, dir);
+
+// Grid & Helpers
+const planeSize = 40;
+const maxHeight = 15;
+const gridSize = 40;
+const divisions = 40;
+const grid = new THREE.GridHelper(gridSize, divisions, 0x999999, 0x888888);
+grid.position.y = 0;
+grid.name = 'floor';
+scene.add(grid);
+
+const manager = new THREE.LoadingManager();
+loadLayout(layoutData.value, manager, maxHeight, scene, perspectiveCamera, controls, planeSize);
+
+/* -------------------------
+   Post-Processing
+------------------------- */
+const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(scene, activeCamera);
+composer.addPass(renderPass);
+
+const outlinePass3D = new OutlinePass(new THREE.Vector2(window.innerWidth, window.innerHeight), scene, perspectiveCamera);
+outlinePass3D.edgeThickness = 2.0;
+outlinePass3D.edgeStrength = 3.0;
+outlinePass3D.visibleEdgeColor.set(0xffffff);
+composer.addPass(outlinePass3D);
+
+const outlinePass2D = new OutlinePass(new THREE.Vector2(window.innerWidth, window.innerHeight), scene, orthoCamera);
+outlinePass2D.edgeThickness = 2.0;
+outlinePass2D.edgeStrength = 3.0;
+outlinePass2D.visibleEdgeColor.set(0xffffff);
+
+let activeOutlinePass = outlinePass3D;
+const gammaPass = new ShaderPass(GammaCorrectionShader);
+composer.addPass(gammaPass);
+
+/* -------------------------
+   Raycasting & Selection Helper
+------------------------- */
+const raycaster = new THREE.Raycaster();
+const selectedObjects = [];
+
+function findRootForSelection(obj) {
+  let o = obj;
+  while (o.parent && o.parent !== scene && o.parent.type !== 'Scene') {
+    o = o.parent;
   }
-];
+  return o;
+}
 
-const itemsData = {
-  walls: [
-    { id: 'w1', name: 'Brick Wall', action: 'add-wall-brick', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 12h20M12 4v8M8 12v8M16 12v8"/></svg>' },
-    { id: 'w2', name: 'Concrete', action: 'add-wall-concrete', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/></svg>' },
-    { id: 'w3', name: 'Glass Wall', action: 'add-wall-glass', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="1"/><path d="M16 2v20M8 2v20"/></svg>' },
-  ],
-  doors: [
-    { id: 'd1', name: 'Single Door', action: 'add-door-std', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 22h14M4 22V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v18M14 12h2"/></svg>' },
-    { id: 'd2', name: 'Double Door', action: 'add-door-dbl', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16"/><path d="M12 4v16M10 12h-2M14 12h2"/></svg>' },
-  ],
-  windows: [
-    { id: 'win1', name: 'Small Window', action: 'add-window-sm', icon: defaultIcon },
-    { id: 'win2', name: 'Large Window', action: 'add-window-lg', icon: defaultIcon },
-  ]
-};
+function getWorldPosition(obj, target = new THREE.Vector3()) {
+  obj.updateWorldMatrix(true, false);
+  return obj.getWorldPosition(target);
+}
 
-// --- NAVIGATION LOGIC ---
-const selectedCategory = ref(null);
-const transitionName = ref('slide-left');
-const currentCategoryLabel = computed(() => categories.find(x => x.id === selectedCategory.value)?.name || '');
-const visibleItems = computed(() => itemsData[selectedCategory.value] || []);
-
-function handleCategoryClick(cat) {
-  // Вече всички категории влизат навътре, включително Room
-  if (cat.hasSubItems) {
-    transitionName.value = 'slide-left';
-    selectedCategory.value = cat.id;
-  } else {
-    emit('action', cat.action);
+function setObjectWorldPosition(obj, worldPos) {
+  if (!obj.parent) obj.position.copy(worldPos);
+  else {
+    obj.parent.updateMatrixWorld(true);
+    obj.position.copy(obj.parent.worldToLocal(worldPos.clone()));
   }
 }
 
-function handleToolClick(action) {
-  emit('action', action);
+function snapVec(v, size) {
+  return new THREE.Vector3(
+    Math.round(v.x / size) * size,
+    Math.round(v.y / size) * size,
+    Math.round(v.z / size) * size
+  );
 }
 
-// Нова функция за създаване на стая от формата
-function handleCreateRoom() {
-  emit('action', { 
-    type: 'create-room', 
-    width: roomSize.width, 
-    length: roomSize.length 
+/* -------------------------
+   ROOM / FLOOR LOGIC (Constraints)
+------------------------- */
+function getAllFloors() {
+  const floors = [];
+  scene.traverse((child) => {
+    if (child.userData && child.userData.filename === 'custom_floor') {
+      floors.push(child);
+    }
   });
+  return floors;
 }
 
-function goBack() {
-  transitionName.value = 'slide-right';
-  selectedCategory.value = null;
+function constrainPositionToFloors(targetPos, object) {
+  const floors = getAllFloors();
+  if (floors.length === 0) {
+    // Fallback logic if no rooms exist
+    const floorBox = new THREE.Box3().setFromObject(grid);
+    const objBox = new THREE.Box3().setFromObject(object);
+    
+    const halfW = (objBox.max.x - objBox.min.x) / 2;
+    const halfD = (objBox.max.z - objBox.min.z) / 2;
+    
+    const minX = floorBox.min.x + halfW;
+    const maxX = floorBox.max.x - halfW;
+    const minZ = floorBox.min.z + halfD;
+    const maxZ = floorBox.max.z - halfD;
+    
+    return new THREE.Vector3(
+        Math.max(minX, Math.min(maxX, targetPos.x)),
+        targetPos.y,
+        Math.max(minZ, Math.min(maxZ, targetPos.z))
+    );
+  }
+
+  // Logic for inside the room
+  const raycasterDown = new THREE.Raycaster();
+  const rayOrigin = targetPos.clone();
+  rayOrigin.y = 50; 
+  raycasterDown.set(rayOrigin, new THREE.Vector3(0, -1, 0));
+
+  const intersects = raycasterDown.intersectObjects(floors, false);
+
+  if (intersects.length > 0) {
+    const floorMesh = intersects[0].object;
+    const floorBox = new THREE.Box3().setFromObject(floorMesh);
+    const objBox = new THREE.Box3().setFromObject(object);
+
+    const halfWidth = (objBox.max.x - objBox.min.x) / 2;
+    const halfDepth = (objBox.max.z - objBox.min.z) / 2;
+
+    const minX = floorBox.min.x + halfWidth;
+    const maxX = floorBox.max.x - halfWidth;
+    const minZ = floorBox.min.z + halfDepth;
+    const maxZ = floorBox.max.z - halfDepth;
+
+    const clampedX = Math.max(minX, Math.min(maxX, targetPos.x));
+    const clampedZ = Math.max(minZ, Math.min(maxZ, targetPos.z));
+
+    return new THREE.Vector3(clampedX, targetPos.y, clampedZ);
+  }
+
+  return targetPos;
 }
 
-// --- DRAG LOGIC (Fixed Size, No Resize Handles) ---
-const menu = reactive({
-  x: 120,
-  y: 120
-});
-
-const menuStyle = computed(() => ({
-  left: `${menu.x}px`,
-  top: `${menu.y}px`,
-  width: '320px', 
-  height: '400px'
-}));
-
-const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
-
+/* -------------------------
+   Drag Existing Objects
+------------------------- */
+const DRAG_PLANE_NORMAL = new THREE.Vector3(0, 1, 0);
+const GRID_SNAP = { enabled: false, size: 0.1 };
 let dragging = false;
-let dragStart = { px: 0, py: 0, sx: 0, sy: 0 };
+let dragObject = null;
+let dragOffset = new THREE.Vector3();
+const dragPlane = new THREE.Plane();
+const intersectionPoint = new THREE.Vector3();
+const tempVec = new THREE.Vector3();
+const tempVec2 = new THREE.Vector3();
+dragPlane.normal.copy(DRAG_PLANE_NORMAL);
 
-function startDrag(e) {
-  if (e.target.closest('button') || e.target.closest('input')) return; // Не влачи при клик върху input или бутон
+function firstIntersectableObjectFromPointer(clientX, clientY) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  const y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera({ x, y }, activeCamera);
+  const intersects = raycaster.intersectObjects(scene.children, true)
+    .filter(hit => {
+      const o = hit.object;
+      if (!o) return false;
+      if (o.userData && o.userData.__isSilhouette) return false;
+      if (typeof o.name === 'string' && o.name.endsWith('_silhouette')) return false;
+      return o.isMesh;
+    });
+  return intersects.length ? intersects[0] : null;
+}
+
+function onPointerDownForDrag(e) {
+  if (e.button !== undefined && e.button !== 0) return;
+  const hit = firstIntersectableObjectFromPointer(e.clientX, e.clientY);
+  if (!hit) { clearSelection(); return; }
+  
+  const rawPicked = hit.object;
+  const root = findRootForSelection(rawPicked);
+  if (root.name === 'floor' || rawPicked.name === 'floor') { clearSelection(); return; }
+  
   dragging = true;
-  dragStart.px = e.clientX;
-  dragStart.py = e.clientY;
-  dragStart.sx = menu.x;
-  dragStart.sy = menu.y;
-  try { e.target.setPointerCapture?.(e.pointerId); } catch {}
-  window.addEventListener('pointermove', onDragMove);
-  window.addEventListener('pointerup', stopDrag);
+  dragObject = root;
+  controls.enabled = false;
+  
+  const objWorldPos = getWorldPosition(dragObject, tempVec);
+  dragPlane.setFromNormalAndCoplanarPoint(DRAG_PLANE_NORMAL, objWorldPos);
+  
+  const rect = renderer.domElement.getBoundingClientRect();
+  const ndc = { x: ((e.clientX - rect.left) / rect.width) * 2 - 1, y: -((e.clientY - rect.top) / rect.height) * 2 + 1 };
+  raycaster.setFromCamera(ndc, activeCamera);
+  raycaster.ray.intersectPlane(dragPlane, intersectionPoint);
+  
+  dragOffset.copy(objWorldPos).sub(intersectionPoint);
+  
+  // Selection
+  if (selectedObjects.length === 0) selectedObjects.push(dragObject);
+  else selectedObjects[0] = dragObject;
+  activeOutlinePass.selectedObjects = selectedObjects;
+
+  const box = new THREE.Box3().setFromObject(dragObject);
+  const size = new THREE.Vector3(); box.getSize(size);
+  
+  // Show new Toolbar
+  updateToolbarPosition();
+  // Show Legacy Props Menu
+  updateProps(root.name, `width: ${size.x.toFixed(2)}, height: ${size.y.toFixed(2)}, depth: ${size.z.toFixed(2)}`);
+  
+  e.preventDefault();
 }
 
-function onDragMove(e) {
-  if (!dragging || !menuEl.value) return;
-  const rect = menuEl.value.getBoundingClientRect();
-  menu.x = clamp(dragStart.sx + (e.clientX - dragStart.px), 0, window.innerWidth - rect.width);
-  menu.y = clamp(dragStart.sy + (e.clientY - dragStart.py), 0, window.innerHeight - rect.height);
+function onPointerMoveForDrag(e) {
+  if (!dragging || !dragObject) return;
+
+  const rect = renderer.domElement.getBoundingClientRect();
+  const ndc = { x: ((e.clientX - rect.left) / rect.width) * 2 - 1, y: -((e.clientY - rect.top) / rect.height) * 2 + 1 };
+  raycaster.setFromCamera(ndc, activeCamera);
+  if (!raycaster.ray.intersectPlane(dragPlane, intersectionPoint)) return;
+
+  let targetWorld = tempVec2.copy(intersectionPoint).add(dragOffset);
+  const currentWorld = getWorldPosition(dragObject, tempVec);
+  targetWorld.y = currentWorld.y;
+
+  if (GRID_SNAP.enabled && GRID_SNAP.size > 0) {
+    const snapped = snapVec(targetWorld, GRID_SNAP.size);
+    targetWorld.copy(snapped);
+    targetWorld.y = currentWorld.y;
+  }
+
+  // --- ROOM CONSTRAINT LOGIC ---
+  const constrainedPosition = constrainPositionToFloors(targetWorld, dragObject);
+  setObjectWorldPosition(dragObject, constrainedPosition);
+
+  e.preventDefault();
 }
 
-function stopDrag() {
-  dragging = false;
-  window.removeEventListener('pointermove', onDragMove);
-  window.removeEventListener('pointerup', stopDrag);
+function onPointerUpForDrag(e) {
+  if (dragging) {
+    try { renderer.domElement.releasePointerCapture(e.pointerId); } catch (_) { }
+    controls.enabled = true;
+    updateLayoutEntryFromObject(dragObject);
+    saveLayoutDebounced();
+    
+    // Update menu text on drop
+    const box = new THREE.Box3().setFromObject(dragObject);
+    const size = new THREE.Vector3(); box.getSize(size);
+    updateProps(dragObject.name, `w:${size.x.toFixed(2)} h:${size.y.toFixed(2)} d:${size.z.toFixed(2)}`);
+    
+    dragging = false;
+    dragObject = null;
+  }
 }
 
-function keepInViewport() {
-  if (!menuEl.value) return;
-  const rect = menuEl.value.getBoundingClientRect();
-  menu.x = clamp(menu.x, 0, window.innerWidth - rect.width);
-  menu.y = clamp(menu.y, 0, window.innerHeight - rect.height);
+/* -------------------------
+   Drag from Menu (Async)
+------------------------- */
+const gltfLoader = new GLTFLoader();
+const gltfCache = new Map();
+let draggingFromMenu = false;
+let previewObject = null;
+let finalObject = null;
+let draggedItem = null;
+let finalizeRequested = false;
+let finalizeDropPosition = null;
+
+async function loadGLTF(url) {
+  if (gltfCache.has(url)) return gltfCache.get(url);
+  const promise = new Promise((resolve, reject) => gltfLoader.load(url, resolve, undefined, reject));
+  gltfCache.set(url, promise);
+  return promise;
 }
 
-onMounted(() => window.addEventListener('resize', keepInViewport));
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', keepInViewport);
-  window.removeEventListener('pointermove', onDragMove);
-  window.removeEventListener('pointerup', stopDrag);
+function deepCloneScene(sceneObj) { return sceneObj.clone(true); }
+
+function cancelMenuDragIfAny() {
+  if (!draggingFromMenu) return;
+  draggingFromMenu = false;
+  finalizeRequested = false;
+  finalizeDropPosition = null;
+  draggedItem = null;
+  if (previewObject && previewObject.parent) previewObject.parent.remove(previewObject);
+  previewObject = null;
+  finalObject = null;
+  if (controls) controls.enabled = true;
+  window.removeEventListener('pointermove', onMenuDragMove);
+  window.removeEventListener('pointerup', onMenuDragEnd);
+}
+
+function makePreviewMaterials(node) {
+  if (!node.isMesh || !node.material) return;
+  const apply = (m) => { const cm = m.clone(); cm.transparent = true; cm.opacity = 0.45; return cm; };
+  node.material = Array.isArray(node.material) ? node.material.map(apply) : apply(node.material);
+}
+
+function makeFinalMaterials(node) {
+  if (!node.isMesh || !node.material) return;
+  const apply = (m) => { const cm = m.clone(); cm.transparent = false; cm.opacity = 1; return cm; };
+  node.material = Array.isArray(node.material) ? node.material.map(apply) : apply(node.material);
+}
+
+async function startDragFromMenu(item) {
+  if (!item) return;
+  cancelMenuDragIfAny();
+  draggingFromMenu = true;
+  draggedItem = item;
+  
+  if (controls) controls.enabled = false;
+  dragPlane.setFromNormalAndCoplanarPoint(DRAG_PLANE_NORMAL, new THREE.Vector3(0, 0, 0));
+
+  const url = `/src/models/${draggedItem.filename}.glb`;
+  let gltf;
+  try {
+    const gltfPromise = loadGLTF(url);
+    window.addEventListener('pointermove', onMenuDragMove, { passive: false });
+    window.addEventListener('pointerup', onMenuDragEnd, { passive: false });
+    gltf = await gltfPromise;
+  } catch (err) {
+    alert('Failed to load model');
+    cancelMenuDragIfAny();
+    return;
+  }
+
+  finalObject = deepCloneScene(gltf.scene);
+  previewObject = deepCloneScene(gltf.scene);
+
+  finalObject.traverse(n => { if (n.isMesh) makeFinalMaterials(n); });
+  previewObject.traverse(n => { if (n.isMesh) makePreviewMaterials(n); });
+
+  const box = new THREE.Box3().setFromObject(finalObject);
+  const offset = box.min.y || 0;
+  finalObject.position.y -= offset;
+  previewObject.position.y -= offset;
+
+  scene.add(previewObject);
+  if (finalizeRequested) finalizeDropAt(finalizeDropPosition || intersectionPoint.clone());
+}
+
+function onMenuDragMove(e) {
+  if (!draggingFromMenu) return;
+  e.preventDefault();
+  const rect = renderer.domElement.getBoundingClientRect();
+  const ndc = { x: ((e.clientX - rect.left) / rect.width) * 2 - 1, y: -((e.clientY - rect.top) / rect.height) * 2 + 1 };
+  raycaster.setFromCamera(ndc, activeCamera);
+  
+  if (!raycaster.ray.intersectPlane(dragPlane, intersectionPoint)) {
+    if (previewObject) previewObject.visible = false;
+    return;
+  }
+
+  if (previewObject) {
+    previewObject.visible = true;
+    const pos = intersectionPoint.clone();
+    
+    // Constrain preview
+    const constrainedPos = constrainPositionToFloors(pos, previewObject);
+    previewObject.position.set(constrainedPos.x, previewObject.position.y, constrainedPos.z);
+  }
+}
+
+function onMenuDragEnd(e) {
+  if (!draggingFromMenu) return;
+  e.preventDefault();
+  const rect = renderer.domElement.getBoundingClientRect();
+  const ndc = { x: ((e.clientX - rect.left) / rect.width) * 2 - 1, y: -((e.clientY - rect.top) / rect.height) * 2 + 1 };
+  raycaster.setFromCamera(ndc, activeCamera);
+  let dropPos = null;
+  if (raycaster.ray.intersectPlane(dragPlane, intersectionPoint)) {
+    dropPos = intersectionPoint.clone();
+  }
+
+  if (finalObject) finalizeDropAt(dropPos);
+  else {
+    finalizeRequested = true;
+    finalizeDropPosition = dropPos;
+  }
+
+  window.removeEventListener('pointermove', onMenuDragMove);
+  window.removeEventListener('pointerup', onMenuDragEnd);
+}
+
+function finalizeDropAt(posWorld) {
+  if (!finalObject) return;
+  
+  if (posWorld) {
+      const constrained = constrainPositionToFloors(posWorld, finalObject);
+      finalObject.position.set(constrained.x, finalObject.position.y, constrained.z);
+  }
+  
+  finalObject.name = draggedItem.name;
+  finalObject.userData = { filename: draggedItem.filename };
+  scene.add(finalObject);
+  addToLayoutData(finalObject);
+
+  // Auto-select dropped object
+  selectedObjects.length = 0;
+  selectedObjects.push(finalObject);
+  activeOutlinePass.selectedObjects = selectedObjects;
+  
+  const box = new THREE.Box3().setFromObject(finalObject);
+  const size = new THREE.Vector3(); box.getSize(size);
+  updateProps(finalObject.name, `w:${size.x.toFixed(2)} h:${size.y.toFixed(2)} d:${size.z.toFixed(2)}`);
+  updateToolbarPosition();
+
+  // Cleanup
+  if (previewObject && previewObject.parent) previewObject.parent.remove(previewObject);
+  previewObject = null;
+  finalObject = null;
+  draggingFromMenu = false;
+  if (controls) controls.enabled = true;
+}
+
+/* -------------------------
+   Layout Data & Persistence
+------------------------- */
+function addToLayoutData(object3D) {
+  const entry = {
+    id: uuidv4(),
+    name: object3D.name,
+    filename: object3D.userData.filename,
+    position: { x: object3D.position.x, y: object3D.position.y, z: object3D.position.z },
+    rotation: { x: object3D.rotation.x, y: object3D.rotation.y, z: object3D.rotation.z },
+    scale: { x: object3D.scale.x, y: object3D.scale.y, z: object3D.scale.z }
+  };
+  object3D.userData.id = entry.id; // Sync ID
+  layoutData.value.push(entry);
+  saveLayoutDebounced();
+}
+
+function updateLayoutEntryFromObject(object3D) {
+  if (!object3D || !object3D.userData) return;
+  const id = object3D.userData.id || object3D.userData._id; if (!id) return;
+  const entry = layoutData.value.find(x => x.id === id); if (!entry) return;
+  entry.position = { ...object3D.position };
+  entry.rotation = { x: object3D.rotation.x, y: object3D.rotation.y, z: object3D.rotation.z };
+  entry.scale = { ...object3D.scale };
+}
+
+async function saveLayout() {
+  try {
+    isSavingLayout.value = true;
+    await updateProjectLayout(projectId, layoutData.value);
+  } catch (err) {
+    console.error('Failed to save layout', err);
+  } finally {
+    isSavingLayout.value = false;
+  }
+}
+
+/* -------------------------
+   Toolbar & Selection Actions
+------------------------- */
+function clearSelection() {
+  selectedObjects.length = 0;
+  activeOutlinePass.selectedObjects = selectedObjects;
+  isToolbarVisible.value = false;
+  
+  // Hide Legacy Menu
+  if (propsMenu) {
+    propsMenu.style.opacity = '0';
+    propsMenu.style.width = '0';
+  }
+  
+  if (rotateInput) {
+    rotateInput.value = '0';
+    if(rotateLeftBtn) rotateLeftBtn.disabled = true;
+    if(rotateRightBtn) rotateRightBtn.disabled = true;
+  }
+}
+
+function updateToolbarPosition() {
+  if (selectedObjects.length === 0) {
+    isToolbarVisible.value = false;
+    return;
+  }
+  const obj = selectedObjects[0];
+  if (!obj) return;
+
+  const box = new THREE.Box3().setFromObject(obj);
+  const center = box.getCenter(new THREE.Vector3());
+  center.y = box.max.y + 3; 
+
+  const vector = center.clone();
+  vector.project(activeCamera);
+
+  const halfWidth = window.innerWidth / 2;
+  const halfHeight = window.innerHeight / 2;
+  toolbarPosition.x = (vector.x * halfWidth) + halfWidth;
+  toolbarPosition.y = -(vector.y * halfHeight) + halfHeight;
+  isToolbarVisible.value = true;
+}
+
+function handleDuplicate() {
+  const original = selectedObjects[0];
+  if (!original) return;
+  const clone = deepCloneScene(original);
+  clone.position.x += 2;
+  clone.position.z += 2;
+  clone.userData.id = uuidv4(); 
+  clone.userData.filename = original.userData.filename;
+  
+  const constrained = constrainPositionToFloors(clone.position, clone);
+  clone.position.copy(constrained);
+
+  scene.add(clone);
+  addToLayoutData(clone);
+  
+  selectedObjects[0] = clone;
+  activeOutlinePass.selectedObjects = selectedObjects;
+  updateToolbarPosition();
+}
+
+function handleToolbarRotate(angleDeg) {
+  const obj = selectedObjects[0];
+  if (!obj) return;
+  obj.rotation.y += (angleDeg * Math.PI / 180);
+  
+  updateLayoutEntryFromObject(obj);
+  saveLayoutDebounced();
+  
+  // Update UI if open
+  if (rotateInput) rotateInput.value = String(Math.round((obj.rotation.y * 180 / Math.PI + 360) % 360));
+}
+
+function handleFlip(axis) {
+  const obj = selectedObjects[0];
+  if (!obj) return;
+  if (axis === 'x') obj.scale.x *= -1;
+  else if (axis === 'z') obj.scale.z *= -1;
+  obj.updateMatrix();
+  updateLayoutEntryFromObject(obj);
+  saveLayoutDebounced();
+}
+
+function handleDelete() {
+  const obj = selectedObjects[0];
+  if (!obj) return;
+  scene.remove(obj);
+  const id = obj.userData.id || obj.userData._id;
+  if (id) layoutData.value = layoutData.value.filter(item => item.id !== id);
+  
+  obj.traverse(child => {
+    if (child.isMesh) {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+        else child.material.dispose();
+      }
+    }
+  });
+  clearSelection();
+  saveLayoutDebounced();
+}
+
+/* -------------------------
+   Camera & Window Logic
+------------------------- */
+function onWindowResize() {
+  renderWidth = window.innerWidth;
+  renderHeight = window.innerHeight * 15 / 16;
+  
+  perspectiveCamera.aspect = renderWidth / renderHeight;
+  perspectiveCamera.updateProjectionMatrix();
+  
+  const aspectNow = renderWidth / renderHeight;
+  orthoCamera.left = (-frustumSize * aspectNow) / 2;
+  orthoCamera.right = (frustumSize * aspectNow) / 2;
+  orthoCamera.top = frustumSize / 2;
+  orthoCamera.bottom = -frustumSize / 2;
+  orthoCamera.updateProjectionMatrix();
+
+  renderer.setSize(renderWidth, renderHeight);
+  composer.setSize(renderWidth, renderHeight);
+  if (outlinePass3D.setSize) outlinePass3D.setSize(renderWidth, renderHeight);
+  if (outlinePass2D.setSize) outlinePass2D.setSize(renderWidth, renderHeight);
+}
+
+function bindControllerToCamera(cam) {
+  if (controls) try { controls.dispose(); } catch (_) { }
+  controls = new OrbitControls(cam, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.update();
+}
+
+function switchTo2D() {
+  dir.intensity = 0;
+  activeCamera = orthoCamera;
+  activeOutlinePass = outlinePass2D;
+  bindControllerToCamera(activeCamera);
+  controls.enableRotate = false;
+  controls.reset(); 
+  activeCamera.position.set(0, 20, 0); 
+  activeCamera.lookAt(0,0,0);
+  
+  renderPass.camera = activeCamera;
+  composer.removePass(outlinePass3D);
+  composer.addPass(outlinePass2D);
+}
+
+function switchTo3D() {
+  dir.intensity = 1;
+  activeCamera = perspectiveCamera;
+  activeOutlinePass = outlinePass3D;
+  bindControllerToCamera(activeCamera);
+  controls.enableRotate = true;
+  
+  renderPass.camera = activeCamera;
+  composer.removePass(outlinePass2D);
+  composer.addPass(outlinePass3D);
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Escape' || e.key === 'Esc' || e.keyCode === 27) {
+    clearSelection();
+    cancelMenuDragIfAny();
+  }
+}
+
+/* -------------------------
+   Lifecycle & Props Menu Restoration
+------------------------- */
+let propsMenu, rotateInput, rotateLeftBtn, rotateRightBtn;
+
+function animate() {
+  if (controls) controls.update();
+  if (selectedObjects.length > 0) updateToolbarPosition();
+  composer.render();
+}
+
+const { theme } = useTheme();
+watch(theme, (t) => { scene.background = new THREE.Color(t === 'dark' ? 0x303541 : 0xb5bbcf); });
+
+onMounted(() => {
+  const container = document.getElementById('edit-project-container');
+  if (container) container.appendChild(renderer.domElement);
+  
+  // RESTORED MENU LOGIC
+  initPropsMenu();
+
+  window.addEventListener('resize', onWindowResize, { passive: true });
+  window.addEventListener('keydown', onKeyDown);
+  renderer.domElement.addEventListener('pointerdown', onPointerDownForDrag, { passive: false });
+  window.addEventListener('pointermove', onPointerMoveForDrag, { passive: false });
+  window.addEventListener('pointerup', onPointerUpForDrag, { passive: false });
+  
+  renderer.setAnimationLoop(animate);
 });
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onWindowResize);
+  window.removeEventListener('keydown', onKeyDown);
+  window.removeEventListener('pointermove', onPointerMoveForDrag);
+  window.removeEventListener('pointerup', onPointerUpForDrag);
+  try { renderer.domElement.removeEventListener('pointerdown', onPointerDownForDrag); } catch (e) { }
+  
+  cancelMenuDragIfAny();
+  renderer.setAnimationLoop(null);
+  
+  if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
+  if (controls) controls.dispose();
+  if (propsMenu && propsMenu.parentNode) propsMenu.parentNode.removeChild(propsMenu);
+});
+
+// --- RESTORED FUNCTIONS: Props Menu ---
+function initPropsMenu() {
+  propsMenu = document.createElement('div');
+  propsMenu.id = 'props-menu';
+  // Standard Layout
+  propsMenu.innerHTML = `
+    <div class="header">
+      <span id="pm-title">Properties</span>
+      <button id="pm-close">×</button>
+    </div>
+    <div class="content" id="pm-info">
+      </div>
+    <div class="footer">
+      <label>Rotate Y:</label>
+      <button id="btn-rot-left">↺</button>
+      <input type="number" id="inp-rot" step="15" value="0" />
+      <button id="btn-rot-right">↻</button>
+    </div>
+  `;
+  document.body.appendChild(propsMenu);
+
+  // References
+  const closeBtn = propsMenu.querySelector('#pm-close');
+  rotateLeftBtn = propsMenu.querySelector('#btn-rot-left');
+  rotateRightBtn = propsMenu.querySelector('#btn-rot-right');
+  rotateInput = propsMenu.querySelector('#inp-rot');
+
+  // Bind Events
+  closeBtn.onclick = () => {
+    clearSelection();
+  };
+
+  rotateLeftBtn.onclick = () => {
+    handleToolbarRotate(90); // Използваме общата логика
+  };
+  
+  rotateRightBtn.onclick = () => {
+    handleToolbarRotate(-90); // Използваме общата логика
+  };
+
+  rotateInput.onchange = (e) => {
+    const newVal = parseFloat(e.target.value) || 0;
+    // Тук е по-сложно да се изчисли делта, затова просто ресетваме ротацията и слагаме нова
+    const obj = selectedObjects[0];
+    if (obj) {
+        obj.rotation.y = newVal * Math.PI / 180;
+        updateLayoutEntryFromObject(obj);
+        saveLayoutDebounced();
+    }
+  };
+}
+
+function updateProps(name, info) {
+  if (!propsMenu) return;
+  const titleSpan = propsMenu.querySelector('#pm-title');
+  const infoDiv = propsMenu.querySelector('#pm-info');
+  
+  if (titleSpan) titleSpan.innerText = name || 'Object';
+  if (infoDiv) infoDiv.innerText = info || '';
+  
+  // Show the menu
+  propsMenu.style.width = '250px';
+  propsMenu.style.opacity = '1';
+
+  // Enable controls
+  if (rotateLeftBtn) rotateLeftBtn.disabled = false;
+  if (rotateRightBtn) rotateRightBtn.disabled = false;
+  
+  // Update rotation input
+  if (rotateInput && selectedObjects[0]) {
+      const deg = Math.round((selectedObjects[0].rotation.y * 180 / Math.PI + 360) % 360);
+      rotateInput.value = String(deg);
+  }
+}
+
+defineExpose({ startDragFromMenu });
 </script>
 
-<style scoped>
-@import './WallsMenuStyle.css';
+<style>
 @import './EditProjectStyle.css';
 </style>
