@@ -4,6 +4,7 @@
       <p @click="switchTo2D">2D</p>
       <p @click="switchTo3D">3D</p>
     </div>
+
     <SelectionToolbar 
       :visible="isToolbarVisible" 
       :position="toolbarPosition" 
@@ -12,11 +13,19 @@
       @flip="handleFlip" 
       @delete="handleDelete" 
     />
+
+    <PropsMenu
+      :visible="isPropsMenuVisible"
+      :name="propsName"
+      :details="propsDetails"
+      :rotation="propsRotation"
+      @update:rotation="handlePropsMenuRotation"
+    />
   </div>
 </template>
 
 <script setup>
-/* EditProject.vue: Cleaned & Merged Version */
+/* EditProject.vue: Cleaned & Integrated with PropsMenu */
 
 import { onMounted, onBeforeUnmount, ref, watch, reactive } from 'vue';
 import { useRoute } from 'vue-router';
@@ -34,6 +43,7 @@ import debounce from 'lodash.debounce';
 // Services & Components
 import { loadLayout, updateProjectLayout } from '../services/layoutService';
 import SelectionToolbar from '../components/SelectionToolbar.vue';
+import PropsMenu from '../components/PropsMenu.vue'; // Импортираме твоя компонент
 import { useTheme } from '../composables/useTheme';
 
 /* -------------------------
@@ -47,9 +57,15 @@ const route = useRoute();
 const projectId = route.params.id;
 const layoutData = ref(Array.isArray(props.projectData.layoutData) ? [...props.projectData.layoutData] : []);
 
-// Toolbar State
+// Toolbar State (Floating)
 const isToolbarVisible = ref(false);
 const toolbarPosition = reactive({ x: 0, y: 0 });
+
+// Props Menu State (Right Sidebar)
+const isPropsMenuVisible = ref(false);
+const propsName = ref('');
+const propsDetails = ref('');
+const propsRotation = ref(0);
 
 // Saving State
 const saveLayoutDebounced = debounce(saveLayout, 500);
@@ -108,8 +124,9 @@ grid.position.y = 0;
 grid.name = 'floor';
 scene.add(grid);
 
+var hasWalls=false;
 const manager = new THREE.LoadingManager();
-loadLayout(layoutData.value, manager, maxHeight, scene, perspectiveCamera, controls, planeSize);
+loadLayout(layoutData.value, manager, maxHeight, scene, perspectiveCamera, controls, planeSize,hasWalls);
 
 /* -------------------------
    Post-Processing
@@ -169,7 +186,7 @@ function snapVec(v, size) {
 }
 
 /* -------------------------
-   ROOM / FLOOR LOGIC (The Constraints)
+   ROOM / FLOOR LOGIC
 ------------------------- */
 function getAllFloors() {
   const floors = [];
@@ -184,12 +201,10 @@ function getAllFloors() {
 function constrainPositionToFloors(targetPos, object) {
   const floors = getAllFloors();
   if (floors.length === 0) {
-    // Ако няма стаи, ползваме ограниченията на grid-а като fallback
+    // Fallback logic
     const floorBox = new THREE.Box3().setFromObject(grid);
     const objBox = new THREE.Box3().setFromObject(object);
     
-    // Преизчисляваме delta спрямо текущата позиция за по-лесно клампване (или директно клампваме координатите)
-    // Тук правим прост clamp в рамките на GridHelper-а
     const halfW = (objBox.max.x - objBox.min.x) / 2;
     const halfD = (objBox.max.z - objBox.min.z) / 2;
     
@@ -205,7 +220,7 @@ function constrainPositionToFloors(targetPos, object) {
     );
   }
 
-  // Логика за ограничаване ВЪТРЕ в стаята
+  // Logic for inside the room
   const raycasterDown = new THREE.Raycaster();
   const rayOrigin = targetPos.clone();
   rayOrigin.y = 50; 
@@ -288,17 +303,13 @@ function onPointerDownForDrag(e) {
   
   dragOffset.copy(objWorldPos).sub(intersectionPoint);
   
-  // Selection logic
+  // Selection
   if (selectedObjects.length === 0) selectedObjects.push(dragObject);
   else selectedObjects[0] = dragObject;
   activeOutlinePass.selectedObjects = selectedObjects;
-
-  const box = new THREE.Box3().setFromObject(dragObject);
-  const size = new THREE.Vector3(); box.getSize(size);
   
-  updateToolbarPosition();
-  // Legacy props update if needed
-  updateProps(root.name, `width: ${size.x.toFixed(2)}, height: ${size.y.toFixed(2)}, depth: ${size.z.toFixed(2)}`);
+  // Update UI (Toolbar & PropsMenu)
+  updateSelectionUI(dragObject);
   
   e.preventDefault();
 }
@@ -321,9 +332,12 @@ function onPointerMoveForDrag(e) {
     targetWorld.y = currentWorld.y;
   }
 
-  // --- ВАЖНО: Прилагане на логиката за стая / ограничение ---
+  // --- ROOM CONSTRAINT LOGIC ---
   const constrainedPosition = constrainPositionToFloors(targetWorld, dragObject);
   setObjectWorldPosition(dragObject, constrainedPosition);
+
+  // Update Props Menu while dragging (coords change)
+  updateSelectionUI(dragObject);
 
   e.preventDefault();
 }
@@ -335,9 +349,7 @@ function onPointerUpForDrag(e) {
     updateLayoutEntryFromObject(dragObject);
     saveLayoutDebounced();
     
-    const box = new THREE.Box3().setFromObject(dragObject);
-    const size = new THREE.Vector3(); box.getSize(size);
-    updateProps(dragObject.name, `w:${size.x.toFixed(2)} h:${size.y.toFixed(2)} d:${size.z.toFixed(2)}`);
+    updateSelectionUI(dragObject);
     
     dragging = false;
     dragObject = null;
@@ -444,7 +456,7 @@ function onMenuDragMove(e) {
     previewObject.visible = true;
     const pos = intersectionPoint.clone();
     
-    // Ограничаваме Preview-то също
+    // Constrain preview
     const constrainedPos = constrainPositionToFloors(pos, previewObject);
     previewObject.position.set(constrainedPos.x, previewObject.position.y, constrainedPos.z);
   }
@@ -475,7 +487,6 @@ function finalizeDropAt(posWorld) {
   if (!finalObject) return;
   
   if (posWorld) {
-      // Ограничаваме финалната позиция
       const constrained = constrainPositionToFloors(posWorld, finalObject);
       finalObject.position.set(constrained.x, finalObject.position.y, constrained.z);
   }
@@ -489,7 +500,8 @@ function finalizeDropAt(posWorld) {
   selectedObjects.length = 0;
   selectedObjects.push(finalObject);
   activeOutlinePass.selectedObjects = selectedObjects;
-  updateToolbarPosition();
+  
+  updateSelectionUI(finalObject);
 
   // Cleanup
   if (previewObject && previewObject.parent) previewObject.parent.remove(previewObject);
@@ -537,33 +549,17 @@ async function saveLayout() {
 }
 
 /* -------------------------
-   Toolbar & Selection Actions
+   Toolbar & Props Interaction Logic
 ------------------------- */
-function clearSelection() {
-  selectedObjects.length = 0;
-  activeOutlinePass.selectedObjects = selectedObjects;
-  isToolbarVisible.value = false;
-  
-  if (propsMenu) {
-    propsMenu.style.opacity = 0;
-    propsMenu.style.width = '0';
-  }
-  // Reset legacy UI
-  if (rotateInput) {
-    rotateInput.value = '0';
-    if(rotateLeftBtn) rotateLeftBtn.disabled = true;
-    if(rotateRightBtn) rotateRightBtn.disabled = true;
-  }
-}
 
-function updateToolbarPosition() {
-  if (selectedObjects.length === 0) {
-    isToolbarVisible.value = false;
+// Unified helper to update both Toolbar and PropsMenu state
+function updateSelectionUI(obj) {
+  if (!obj) {
+    clearSelection();
     return;
   }
-  const obj = selectedObjects[0];
-  if (!obj) return;
 
+  // 1. Update Floating Toolbar Position
   const box = new THREE.Box3().setFromObject(obj);
   const center = box.getCenter(new THREE.Vector3());
   center.y = box.max.y + 3; 
@@ -576,8 +572,45 @@ function updateToolbarPosition() {
   toolbarPosition.x = (vector.x * halfWidth) + halfWidth;
   toolbarPosition.y = -(vector.y * halfHeight) + halfHeight;
   isToolbarVisible.value = true;
+
+  // 2. Update Props Menu (Vue Refs)
+  const size = new THREE.Vector3(); 
+  box.getSize(size);
+  
+  isPropsMenuVisible.value = true;
+  propsName.value = obj.name || 'Unknown Object';
+  // Format: w:20 h:30 d:40
+  propsDetails.value = `w:${size.x.toFixed(2)} h:${size.y.toFixed(2)} d:${size.z.toFixed(2)}`;
+  
+  // Convert Radians to Degrees for UI
+  const degrees = Math.round((obj.rotation.y * 180 / Math.PI));
+  propsRotation.value = degrees; 
 }
 
+function clearSelection() {
+  selectedObjects.length = 0;
+  activeOutlinePass.selectedObjects = selectedObjects;
+  
+  // Hide UI
+  isToolbarVisible.value = false;
+  isPropsMenuVisible.value = false;
+}
+
+// Handler for when user rotates via the Props Menu Input/Buttons
+function handlePropsMenuRotation(newDegrees) {
+  const obj = selectedObjects[0];
+  if (!obj) return;
+
+  // Convert Degrees to Radians
+  obj.rotation.y = newDegrees * Math.PI / 180;
+  
+  // Update UI and Save
+  propsRotation.value = newDegrees; // Sync ref back immediately
+  updateLayoutEntryFromObject(obj);
+  saveLayoutDebounced();
+}
+
+// Handlers for Toolbar Actions
 function handleDuplicate() {
   const original = selectedObjects[0];
   if (!original) return;
@@ -587,7 +620,6 @@ function handleDuplicate() {
   clone.userData.id = uuidv4(); 
   clone.userData.filename = original.userData.filename;
   
-  // Ограничаваме клонинга
   const constrained = constrainPositionToFloors(clone.position, clone);
   clone.position.copy(constrained);
 
@@ -596,19 +628,21 @@ function handleDuplicate() {
   
   selectedObjects[0] = clone;
   activeOutlinePass.selectedObjects = selectedObjects;
-  updateToolbarPosition();
+  updateSelectionUI(clone);
 }
 
 function handleToolbarRotate(angleDeg) {
+  // Rotates relative to current position
   const obj = selectedObjects[0];
   if (!obj) return;
   obj.rotation.y += (angleDeg * Math.PI / 180);
   
+  // Update internal logic
   updateLayoutEntryFromObject(obj);
   saveLayoutDebounced();
   
-  // Update legacy UI if open
-  if (rotateInput) rotateInput.value = String(Math.round((obj.rotation.y * 180 / Math.PI + 360) % 360));
+  // Sync the Props Menu input
+  updateSelectionUI(obj);
 }
 
 function handleFlip(axis) {
@@ -619,6 +653,7 @@ function handleFlip(axis) {
   obj.updateMatrix();
   updateLayoutEntryFromObject(obj);
   saveLayoutDebounced();
+  updateSelectionUI(obj);
 }
 
 function handleDelete() {
@@ -709,11 +744,12 @@ function onKeyDown(e) {
 /* -------------------------
    Lifecycle
 ------------------------- */
-let propsMenu, rotateInput, rotateLeftBtn, rotateRightBtn;
-
 function animate() {
   if (controls) controls.update();
-  if (selectedObjects.length > 0) updateToolbarPosition();
+  if (selectedObjects.length > 0) {
+    // Optional: Keep toolbar strictly synced every frame if camera moves
+    updateSelectionUI(selectedObjects[0]); 
+  }
   composer.render();
 }
 
@@ -723,8 +759,6 @@ watch(theme, (t) => { scene.background = new THREE.Color(t === 'dark' ? 0x303541
 onMounted(() => {
   const container = document.getElementById('edit-project-container');
   if (container) container.appendChild(renderer.domElement);
-  
-  initPropsMenu();
 
   window.addEventListener('resize', onWindowResize, { passive: true });
   window.addEventListener('keydown', onKeyDown);
@@ -747,18 +781,9 @@ onBeforeUnmount(() => {
   
   if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
   if (controls) controls.dispose();
-  if (propsMenu && propsMenu.parentNode) propsMenu.parentNode.removeChild(propsMenu);
 });
 
-/* Legacy Props Menu */
-function initPropsMenu() {
-  propsMenu = document.createElement('div');
-  propsMenu.id = 'props-menu';
-  document.body.appendChild(propsMenu);
-}
-function updateProps(name, info) { }
-
-defineExpose({ startDragFromMenu });
+defineExpose({ startDragFromMenu ,hasWalls});
 </script>
 
 <style>

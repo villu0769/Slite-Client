@@ -23,7 +23,7 @@
     <button @click="useTheme().toggleTheme">
       Switch theme
     </button>
-    <WallsMenu :isOpen="wallsMenuOpen" @close="wallsMenuOpen = false" @action="onWallsAction"/>
+    <WallsMenu :isOpen="wallsMenuOpen" @close="wallsMenuOpen = false" @action="onWallsAction" :hasWalls="hasWalls"/>
     <FloatingMenu :isOpen="menuOpen" @close="menuOpen = false" @start-drag="onSelectItem" />
   </aside>
 </template>
@@ -33,6 +33,10 @@ import { ref } from 'vue';
 import FloatingMenu from './FloatingMenu.vue';
 import { useTheme } from '../composables/useTheme';
 import WallsMenu from './WallsMenu.vue';
+
+const props = defineProps({
+  hasWalls:{type:Boolean,required:true}
+});
 
 const menuOpen = ref(false);
 const wallsMenuOpen = ref(false);

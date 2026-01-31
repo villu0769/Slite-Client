@@ -15,7 +15,7 @@
     </button>
     </div>
   <div id="content">
-    <Sidebar @start-drag="onStartDragFromMenu" @action="handleSidebarAction"/>
+    <Sidebar @start-drag="onStartDragFromMenu" @action="handleSidebarAction" :hasWalls="hasWalls"/>
     <EditProject v-if="projectData" :projectData="projectData" ref="editProjectRef" />
   </div>
 
@@ -36,6 +36,7 @@ function goBack() {
   router.push('/projects');
 }
 const editProjectRef = ref(null);
+var hasWalls=editProjectRef.value?.hasWalls;
 
 function onStartDragFromMenu(item) {
   // forward to EditProject's method

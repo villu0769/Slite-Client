@@ -5,7 +5,7 @@ import * as THREE from 'three';
 const floorMat = new THREE.MeshStandardMaterial({ color: 0xd0d0d0, roughness: 0.5 });
 const wallMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.8 });
 
-export const loadLayout = async (layoutData, manager, maxHeight, scene, perspectiveCamera, controls, planeSize) => {
+export const loadLayout = async (layoutData, manager, maxHeight, scene, perspectiveCamera, controls, planeSize,hasWalls) => {
   if (!Array.isArray(layoutData) || layoutData.length === 0) return;
 
   const loader = getGLTFLoader(manager);
@@ -56,7 +56,7 @@ export const loadLayout = async (layoutData, manager, maxHeight, scene, perspect
 
           // Добавяме в сцената
           scene.add(mesh);
-
+          hasWalls=true;
           return; // <-- ВАЖНО: Спираме дотук за този item, не търсим .glb файл
         } catch (err) {
           console.error("Error creating custom geometry", err);
