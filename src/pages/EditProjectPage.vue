@@ -15,7 +15,7 @@
     </button>
     </div>
   <div id="content">
-    <Sidebar @start-drag="onStartDragFromMenu" />
+    <Sidebar @start-drag="onStartDragFromMenu" @action="handleSidebarAction"/>
     <EditProject v-if="projectData" :projectData="projectData" ref="editProjectRef" />
   </div>
 
@@ -41,7 +41,21 @@ function onStartDragFromMenu(item) {
   // forward to EditProject's method
   editProjectRef.value?.startDragFromMenu(item);
 }
-
+function handleSidebarAction(payload) {
+  // Проверяваме типа на действието
+  if (payload && payload.type === 'create-room') {
+    // Извикваме createRoom от EditProject.vue
+    // payload.width и payload.length идват от WallsMenu input-ите
+    editProjectRef.value?.createRoom(payload.width, payload.length);
+  } 
+  
+  // Тук можеш да добавиш else if за други инструменти (стени, врати)
+  else if (typeof payload === 'string') {
+     // Ако е string (напр. 'add-wall-brick'), можеш да го подадеш на друга функция
+     // console.log("Избран инструмент:", payload);
+     // editProjectRef.value?.activateTool(payload); // (ако имаш такава)
+  }
+}
 // route
 const route = useRoute();
 const id = route.params.id;

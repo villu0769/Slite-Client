@@ -1,0 +1,165 @@
+.walls-btn{
+    display: flex;
+    justify-content: space-evenly;
+    align-content: center;
+    width: 145px;
+    height:55px;
+    padding: 7px 0 1px 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background-color: var(--bg);
+    cursor: pointer;
+    color: color-mix(in srgb, var(--text), transparent 10%);
+    fill:var(--text);
+    fill-opacity: 0.85;
+    transition: background-color 0.3s, box-shadow 0.3s;
+}
+.walls-btn span{
+    height: 100%;
+    padding-top:7px ;
+    font-weight: 650;
+}
+.buttons-grid{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 7px;
+    gap:10px;
+}
+
+.cat-label-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.cat-icon {
+  display: flex;
+  align-items: center;
+  color: var(--accent);
+}
+
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 10px;
+  padding-bottom: 20px;
+}
+
+.tool-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  aspect-ratio: 1;
+  background: color-mix(in srgb, var(--bg), transparent 40%);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text);
+}
+
+.tool-btn:hover {
+  background: var(--bg);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.tool-icon {
+  width: 32px;
+  height: 32px;
+  color: var(--text);
+  opacity: 0.8;
+}
+
+.tool-btn:hover .tool-icon {
+  color: var(--accent);
+  opacity: 1;
+}
+
+.tool-name {
+  font-size: 11px;
+  text-align: center;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+/* ROOM FORM STYLES */
+.room-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 10px 4px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.input-group label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  opacity: 0.8;
+  margin-left: 4px;
+}
+
+.input-group input {
+  background: color-mix(in srgb, var(--bg), transparent 40%);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.input-group input:focus {
+  border-color: var(--accent);
+  background: var(--bg);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent), transparent 80%);
+}
+
+.create-btn {
+  margin-top: 8px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.create-btn:hover {
+  opacity: 0.9;
+}
+
+.create-btn:active {
+  transform: scale(0.98);
+}
+
+.category-btn:disabled {
+  opacity: 0.5;              /* Прави го полупрозрачен */
+  cursor:auto;       /* Показва забранителен знак на мишката */
+  filter: grayscale(100%);   /* (Опционално) Прави иконата сива */
+  background: rgba(0,0,0,0.05); /* Лек фон, за да се вижда, че е там */
+  transform: none;           /* Спира подскачането */
+  box-shadow: none;          /* Маха сянката */
+  border-color: transparent; /* Маха бордера */
+}
+
+/* Гарантираме, че при ховър нищо не се случва */
+.category-btn:disabled:hover {
+  background: rgba(0,0,0,0.05);
+  border-color: transparent;
+  transform: none;
+  box-shadow: none;
+}

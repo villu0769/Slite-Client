@@ -35,35 +35,6 @@ canvas{
   cursor: pointer;
   background-color: grey;
 }
-#props-menu{
-  position:absolute;
-  top:8vh;
-  right: 40px;
-  height: 90vh;
-  width:0;
-  opacity:0;
-  z-index: 3;
-  color:white;
-  background-color: #2b3943;
-  border-radius: 10px;
-  transition: opacity 0.25s;
-  padding: 20px;
-  overflow: visible;
-}
-.props-resize-handle {
-  position: absolute;
-  background: rgba(255,255,255,0.06);
-  border-radius: 6px;
-  transition: background 0.08s ease;
-  touch-action: none;
-  z-index: 4;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
-}
-
-.props-resize-handle:hover {
-  background: rgba(255,255,255,0.12);
-}
-
 /* vertical handle on the right edge -> drag horizontally to resize width */
 .right-handle {
   top: 50%;
@@ -98,53 +69,9 @@ canvas{
 
 
 
-
-/* --- EditProjectStyle.css --- */
-
-/* Основен контейнер на менюто */
 /* --- Props Menu (Дясната лента с настройки) --- */
 
-#props-menu {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  z-index: 20; /* Гарантира, че е над сцената */
 
-  /* Glassmorphism с твоите променливи */
-  /* Използваме --bg-soft с 15% прозрачност за ефекта на стъкло */
-  background: color-mix(in srgb, var(--bg-soft), transparent 15%);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-
-  /* Граници и сенки от темата */
-  border: 1px solid var(--border);
-  box-shadow: var(--menu-shadow);
-  border-radius: 16px;
-
-  /* Размери и преходи */
-  padding: 0;
-  box-sizing: border-box;
-  overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-
-  /* Текст */
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  color: var(--text);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-
-  /* Първоначално състояние */
-  opacity: 0;
-  width: 0;
-  pointer-events: none;
-}
-
-/* Активно състояние */
-#props-menu[style*="opacity: 1"] {
-  padding: 16px;
-  pointer-events: auto;
-}
 
 /* Име на обекта */
 #props-selected-name {

@@ -82,7 +82,7 @@ const menuEl = ref(null);
 ------------------------- */
 const menu = reactive({
   x: 120,
-  y: 80,
+  y: 100,
   width: 360,
   height: 420,
   minWidth: 300,
@@ -194,7 +194,7 @@ const categories = [
 ];
 
 const furnitureByCategory = {
-  living: [{ filename: 'sofa', name: 'Sofa', pic: 'sofa.jpg' }, { filename: 'table', name: 'Table', pic: 'table.png' },{ filename: 'sofa', name: 'Sofa', pic: 'sofa.jpg' },{ filename: 'sofa', name: 'Sofa', pic: 'sofa.jpg' }],
+  living: [{ filename: 'sofa', name: 'Sofa', pic: 'sofa.jpg' }, { filename: 'table', name: 'Table', pic: 'table.png' },{ filename: 'simple_kitchen_cabinet', name: 'Kitchen Cabinet', pic: 'simple_kitchen_cabinet.png' },{ filename: 'sofa', name: 'Sofa', pic: 'sofa.jpg' }],
   bedroom: [{ filename: 'bed', name: 'Bed', pic: 'bed.jpg' }, { filename: 'wardrobe', name: 'Wardrobe', pic: 'wardrobe.jpg' }],
 };
 
