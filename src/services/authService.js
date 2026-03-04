@@ -1,12 +1,31 @@
+const API_URL = "https://slite-api.onrender.com";
 
+export const fetchUsers = async (page = 1, limit = 10) => {
+  const token = localStorage.getItem('token');
+  
+  const response = await fetch(`${API_URL}/api/auth?page=${page}&limit=${limit}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
+    }
+  });
 
-export const registerUser = async (email,password) => {
-  const response = await fetch("http://localhost:5000/api/auth/register", {
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.message || 'Грешка при зареждане на потребители');
+  }
+  return result.data; // Връща { message, data: { users, pagination } }
+};
+
+export const registerUser = async ({email,username,password,role='user'}) => {
+  const response = await fetch(`${API_URL}/api/auth/register`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(email,password),
+    body: JSON.stringify({ email, password,username,role }),
   });
 
  const result = await response.json();
@@ -14,17 +33,35 @@ export const registerUser = async (email,password) => {
   if (!response.ok) {
     throw new Error(result.message);
   }
-  const { message, user } = result;
-  return { message, user };
+  const { token, user } = result;
+  return { token, user };
 };
 
-export const loginUser = async (email,password) => {
-  const response = await fetch("http://localhost:5000/api/auth/login", {
+export const loginUser = async ({email,password}) => {
+  const response = await fetch(`${API_URL}/api/auth/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(email,password),
+    body: JSON.stringify({ email, password }),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.message);
+  }
+  const { token, user } = result;
+  return { token, user };
+};
+
+export const deleteUser = async (userId) => {
+  const response = await fetch(`${API_URL}/api/auth/${userId}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${localStorage.getItem('token')}`
+    },
   });
 
   const result = await response.json();

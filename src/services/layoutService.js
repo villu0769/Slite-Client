@@ -1,73 +1,18 @@
 import { getGLTFLoader } from '../services/gltfLoader'
 
 import * as THREE from 'three';
-// Дефинирай материалите извън функцията или в началото, за да са консистентни
-const floorMat = new THREE.MeshStandardMaterial({ color: 0xd0d0d0, roughness: 0.5 });
-const wallMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.8 });
+const API_URL = "https://slite-api.onrender.com";
 
-export const loadLayout = async (layoutData, manager, maxHeight, scene, perspectiveCamera, controls, planeSize) => {
+export const loadLayout = async (layoutData, manager, maxHeight, scene, perspectiveCamera, controls, planeSize,hasWalls) => {
   if (!Array.isArray(layoutData) || layoutData.length === 0) return;
 
   const loader = getGLTFLoader(manager);
-
+ 
   await Promise.all(
     layoutData.map(async (item) => {
-
-      // --- НОВА ЧАСТ: Проверка за Custom обекти (Стени/Под) ---
-      if (item.filename === 'custom_floor' || item.filename === 'custom_wall') {
-        try {
-          // 1. Взимаме размерите, записани в JSON-а (или дефолтни)
-          const w = item.dims ? item.dims.w : 1;
-          const h = item.dims ? item.dims.h : 1;
-          const d = item.dims ? item.dims.d : 1;
-
-          // 2. Създаваме геометрия
-          const geometry = new THREE.BoxGeometry(w, h, d);
-
-          // 3. Избираме материал
-          const material = (item.filename === 'custom_floor') ? floorMat : wallMat;
-
-          const mesh = new THREE.Mesh(geometry, material);
-
-          // 4. Възстановяване на трансформациите
-          // Важно: Понеже при създаването на стая сме позиционирали geometry-то специфично,
-          // тук просто връщаме позицията на меша.
-          mesh.position.set(item.position.x, item.position.y, item.position.z);
-          // Rotation
-          mesh.rotation.set(
-            item.rotation.x || 0,
-            item.rotation.y || 0,
-            item.rotation.z || 0
-          );
-          // Scale (обикновено е 1, но ако е скалирано по-късно)
-          mesh.scale.set(
-            item.scale.x || 1,
-            item.scale.y || 1,
-            item.scale.z || 1
-          );
-
-          // 5. Възстановяване на данни
-          mesh.name = item.name;
-          mesh.userData = {
-            id: item.id,
-            filename: item.filename,
-            dims: item.dims // Запазваме dims, за да може пак да се сейвне правилно
-          };
-
-          // Добавяме в сцената
-          scene.add(mesh);
-
-          return; // <-- ВАЖНО: Спираме дотук за този item, не търсим .glb файл
-        } catch (err) {
-          console.error("Error creating custom geometry", err);
-          return;
-        }
-      }
-      // --------------------------------------------------------
-
       // --- СТАРА ЧАСТ: Зареждане на мебели (.glb) ---
       try {
-        const modelUrl = `/models/${item.filename}.glb`;
+        const modelUrl = `/app/models/${item.filename}.glb`;
 
         // Зареждаме директно от URL-а
         const gltf = await loader.loadAsync(modelUrl);
@@ -83,21 +28,12 @@ export const loadLayout = async (layoutData, manager, maxHeight, scene, perspect
         gltf.scene.position.y = item.position.y || 0;
         gltf.scene.position.z = item.position.z || 0;
         gltf.scene.rotation.y = item.rotation.y || 0;
-<<<<<<< HEAD
-
-        // Мащабиране (добавих го, защото често липсва)
-        if (item.scale) {
-          gltf.scene.scale.set(item.scale.x, item.scale.y, item.scale.z);
-        }
-
-=======
         if (item.scale) {
         gltf.scene.scale.set(item.scale.x, item.scale.y, item.scale.z);
       } else {
         // Дефолт, ако няма данни (за да не стане мащаб 0)
         gltf.scene.scale.set(1, 1, 1);
       }
->>>>>>> 5cf0d0d484205872545dc9fa35007a834c4b4ea5
         gltf.scene.name = item.name || item.filename;
         gltf.scene.userData = { id: item.id, filename: item.filename };
 
@@ -140,7 +76,7 @@ export const loadLayout = async (layoutData, manager, maxHeight, scene, perspect
 };
 
 export const updateProjectLayout = async (projectId, layoutData) => {
-  const response = await fetch(`http://localhost:5000/api/projects/${projectId}/layout`, {
+  const response = await fetch(`${API_URL}/api/projects/${projectId}/layout`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -148,11 +84,66 @@ export const updateProjectLayout = async (projectId, layoutData) => {
     },
     body: JSON.stringify({ layoutData }),
   });
+  const result = await response.json();
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to update layout');
+    throw new Error(result.message);
   }
 
-  return response.json();
+  return result.data;
 }
+
+export const addRoom = async (projectId, wallsData) => {
+  const response = await fetch(`${API_URL}/api/projects/${projectId}/rooms/add`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${localStorage.getItem('token')}`,
+    },
+    body: JSON.stringify(wallsData),
+  });
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.message);
+  }
+
+  return result.data;
+};
+
+
+export const deleteRoom = async (projectId, roomId) => {
+  const response = await fetch(`${API_URL}/api/projects/${projectId}/rooms/delete`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${localStorage.getItem('token')}`,
+    },
+    body: JSON.stringify({ roomId }),
+  });
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.message);
+  }
+
+  return result.data;
+};
+
+export const updateRoom = async (projectId,  roomId, wallsData ) => {
+  const response = await fetch(`${API_URL}/api/projects/${projectId}/rooms`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${localStorage.getItem('token')}`,
+    },
+    body: JSON.stringify({ roomId, wallsData }),
+  });
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.message);
+  }
+
+  return result.data;
+};

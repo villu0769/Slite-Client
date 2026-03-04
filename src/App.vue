@@ -7,5 +7,6 @@
   </div>
 </template>
 
-<style scoped>
+<style >
+@import './style.css';
 </style>

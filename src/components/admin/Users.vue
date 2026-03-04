@@ -1,0 +1,168 @@
+<template>
+  <div class="users-container">
+    <div class="header-actions">
+      <h2>Потребители</h2>
+      <button class="btn btn-primary" @click="openRegisterModal">
+        + Нов потребител
+      </button>
+    </div>
+
+    <div v-if="isLoading" class="state-msg">Зареждане...</div>
+    <div v-else-if="isError" class="state-msg error">{{ error.message }}</div>
+
+    <div v-else class="table-responsive">
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Потребител</th>
+            <th>Email</th>
+            <th>Роля</th>
+            <th>Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="user in data?.users" :key="user._id">
+            <td class="id-col">..{{ user._id.slice(-4) }}</td>
+            <td>{{ user.username || user.name }}</td>
+            <td>{{ user.email }}</td>
+            <td>
+              <span :class="['role-badge', user.role ? user.role.toLowerCase() : 'user']">
+                {{ user.role || 'User' }}
+              </span>
+            </td>
+            <td>
+              <button class="btn btn-delete" @click="handleDeleteUser(user._id)">Delete</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div v-if="data?.pagination" class="pagination-controls">
+      <button 
+        class="btn btn-secondary" 
+        :disabled="!data?.pagination.hasPrevPage"
+        @click="prevPage"
+      > &lt; </button>
+
+      <span class="page-info">
+        {{ data.pagination.currentPage }} / {{ data.pagination.totalPages }}
+      </span>
+
+      <button 
+        class="btn btn-secondary" 
+        :disabled="!data.pagination.hasNextPage"
+        @click="nextPage"
+      > &gt; </button>
+    </div>
+
+    <div v-if="isRegistering" class="modal-backdrop" @click.self="closeRegisterModal">
+      <div class="glass-modal">
+        <h3>Нов потребител</h3>
+        <form @submit.prevent="handleRegister">
+          <div class="form-group">
+            <label>Email</label>
+            <input v-model="form.email" type="email" required placeholder="email@example.com" />
+          </div>
+          <div class="form-group">
+            <label>Username</label>
+            <input v-model="form.username" type="text" required placeholder="user123" />
+          </div>
+          <div class="form-group">
+            <label>Роля</label>
+            <select v-model="form.role">
+              <option value="user">Обикновен потребител</option>
+              <option value="admin">Админ</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Парола</label>
+            <div class="password-group">
+              <input v-model="form.password" type="text" readonly />
+              <button type="button" class="btn btn-secondary" @click="regeneratePassword">↻</button>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" @click="closeRegisterModal">Отказ</button>
+            <button type="submit" class="btn btn-primary" :disabled="mutation.isLoading.value">
+              {{ mutation.isLoading.value ? '...' : 'Създай' }}
+            </button>
+          </div>
+          <p v-if="mutation.isError.value" class="error-msg">
+            {{ mutation.error.value.message }}
+          </p>
+        </form>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive } from 'vue';
+import { useQuery, useMutation, useQueryClient } from 'vue-query';
+import { fetchUsers, registerUser,deleteUser } from '../../services/authService';
+
+const queryClient = useQueryClient();
+const page = ref(1);
+const limit = 10;
+const isRegistering = ref(false);
+
+// 1. Fetch Users
+const { data, isLoading, isError, error } = useQuery(
+  ['users', page], 
+  () => fetchUsers(page.value, limit),
+  { keepPreviousData: true }
+);
+
+// 2. Pagination Handlers
+const nextPage = () => { if (data.value.data.pagination.hasNextPage) page.value++; };
+const prevPage = () => { if (data.value.data.pagination.hasPrevPage) page.value--; };
+
+// 3. Form & Logic
+const form = reactive({ email: '', username: '', role: 'user', password: '' });
+
+const genPass = () => {
+  const chars = '&013459_abcdfgijkopstvyz-BCDEGHIJKMPQTUVXY+';
+  let pass = '';
+  for (let i = 0; i < 16; i++) {
+    pass += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return pass;
+};
+const regeneratePassword = () => form.password = genPass();
+
+const openRegisterModal = () => {
+  Object.assign(form, { email: '', username: '', role: 'user', password: genPass() });
+  isRegistering.value = true;
+};
+const closeRegisterModal = () => isRegistering.value = false;
+
+// 4. Mutation
+const mutation = useMutation(registerUser, {
+  onSuccess: () => {
+    queryClient.invalidateQueries(['users']);
+    closeRegisterModal();
+  }
+});
+
+const handleRegister = () => {
+  // Изпращаме целия обект form
+  mutation.mutate({ email:form.email,username:form.username,password:form.password,role:form.role });
+};
+
+const handleDeleteUser = async (userId) => {
+  if (!confirm("Are you sure you want to delete this user?")) return;
+  deleteUser(userId).then(() => {
+    queryClient.invalidateQueries(['users']);
+  }).catch(err => {
+    alert("Failed to delete user: " + err.message);
+  });
+};
+
+</script>
+
+<style scoped>
+@import 'Admin.css';
+</style>

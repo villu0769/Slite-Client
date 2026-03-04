@@ -1,93 +1,102 @@
 <template>
-  <v-container class="fill-height d-flex align-center justify-center">
-    <v-card elevation="12" class="pa-6" max-width="400">
-      <v-card-subtitle class="text-center text-h5 mb-4">Sign up</v-card-subtitle>
+  <div class="auth-container">
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
 
-      <form @submit.prevent="onSubmit">
-        <v-text-field
-          v-model="form.email"
-          label="Email"
-          :error-messages="errors.email"
-          outlined
-          dense
-          required
-        />
-        <v-text-field
-          v-model="form.password"
-          label="Password"
-          type="password"
-          :error-messages="errors.password"
-          outlined
-          dense
-          required
-        />
+    <div class="glass-card">
+      <div class="header-section">
+        <h1 class="brand-title">Slite<span class="dot">.</span></h1>
+        <h2 class="form-title">Създай акаунт</h2>
+      </div>
 
-        <v-btn
-          type="submit"
-          block
-          class="mt-4"
-          color="primary"
-        >
-          Sign up
-        </v-btn>
+      <form @submit.prevent="onSubmit" class="auth-form">
+        <div class="input-group">
+          <label for="email">Имейл</label>
+          <input type="email" id="email" v-model="form.email" :class="{ 'has-error': errors.email }"
+            placeholder="name@example.com" />
+          <span v-if="errors.email" class="error-text">{{ errors.email }}</span>
+        </div>
+        <div class="input-group">
+          <label for="username">Потребителско име</label>
+          <input type="username" id="username" v-model="form.email" :class="{ 'has-error': errors.username }" />
+          <span v-if="errors.username" class="error-text">{{ errors.username }}</span>
+        </div>
+        <div class="input-group">
+          <label for="password">Парола</label>
+          <input type="password" id="password" v-model="form.password" :class="{ 'has-error': errors.password }"
+            placeholder="••••••••" />
+          <span v-if="errors.password" class="error-text">{{ errors.password }}</span>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" :disabled="mutation.isLoading.value">
+          <span v-if="mutation.isLoading.value">Зареждане...</span>
+          <span v-else>Регистрация</span>
+        </button>
       </form>
 
-      <v-row class="mt-2" justify="space-between">
-        <v-btn text @click="goTo('/help-form')">Need help?</v-btn>
-        <v-btn text @click="goTo('/forgot-password')">Forgotten password?</v-btn>
-      </v-row>
-    </v-card>
+      <div class="form-footer">
+        <p>Вече имаш акаунт? <a href="#" @click.prevent="goTo('/login')">Вход</a></p>
+      </div>
+    </div>
 
-    <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="1500">
-      {{ snackbar.message }}
-    </v-snackbar>
-  </v-container>
+    <transition name="fade">
+      <div v-if="notification.show" :class="['notification', notification.type]">
+        {{ notification.message }}
+      </div>
+    </transition>
+  </div>
 </template>
 
 <script setup>
 import { reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMutation } from 'vue-query'
-import { registerUser } from '../services/authService'
+import { registerUser } from '../services/authService' // Увери се, че пътят е верен
 
 const router = useRouter()
 
-// Form data & errors
+// Form Data
 const form = reactive({ email: '', password: '' })
 const errors = reactive({ email: '', password: '' })
 
-// Snackbar
-const snackbar = reactive({ show: false, message: '', color: 'success' })
+// Custom Notification State
+const notification = reactive({ show: false, message: '', type: 'success' })
 
-// Navigate helper
-const goTo = (path) => router.push(path)
-
-// Form validation
-const validate = () => {
-  errors.email = !form.email
-    ? 'Email is required'
-    : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)
-    ? 'Please enter a valid email'
-    : ''
-
-  errors.password = !form.password ? 'Password is required' : ''
-
-  return !errors.email && !errors.password
+const showNotification = (msg, type = 'success') => {
+  notification.message = msg
+  notification.type = type
+  notification.show = true
+  setTimeout(() => { notification.show = false }, 3000)
 }
 
-// Mutation (register)
+const goTo = (path) => router.push(path)
+
+// Validation
+const validate = () => {
+  errors.email = !form.email
+    ? 'Имейлът е задължителен'
+    : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)
+      ? 'Моля въведете валиден имейл'
+      : ''
+
+
+  errors.password = !form.password ? 'Паролата е задължителна' : '';
+  errors.username = !form.username ? 'Потребителското име е задължително' : '';
+  return !errors.email && !errors.password && !errors.username;
+}
+
+// Mutation
 const mutation = useMutation(registerUser, {
   onSuccess: (data) => {
-    localStorage.setItem('token', data.user.token)
-    snackbar.message = 'Successfully registered'
-    snackbar.color = 'success'
-    snackbar.show = true
-    setTimeout(() => router.push('/projects'), 1600)
+    localStorage.setItem('token', data.token || data.token) // Провери структурата на отговора
+    localStorage.setItem('role', data.user.role)
+    showNotification('Успешна регистрация! Пренасочване...', 'success')
+    setTimeout(() => router.push('/projects'), 1500)
   },
   onError: (err) => {
-    snackbar.message = err.message || 'Invalid email or password'
-    snackbar.color = 'error'
-    snackbar.show = true
+    // Взимаме съобщението от бекенда или дефолтно
+    const msg = err.response?.data?.message || err.message || 'Възникна грешка при регистрацията'
+    showNotification(msg, 'error')
   },
 })
 
@@ -98,7 +107,233 @@ const onSubmit = () => {
 </script>
 
 <style scoped>
-.logo {
-  width: 120px;
+/* --- Global Layout & Fonts --- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700;900&display=swap');
+
+.auth-container {
+  font-family: 'Inter', sans-serif;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  /* Спира скрола на прозореца */
+  background-color: #0f1115;
+  background-image:
+    radial-gradient(at 10% 10%, rgba(74, 144, 226, 0.15) 0px, transparent 50%),
+    radial-gradient(at 90% 90%, rgba(140, 82, 255, 0.15) 0px, transparent 50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  color: #ffffff;
+}
+
+/* --- Orbs --- */
+.glow-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.6;
+  z-index: 1;
+  animation: float 10s infinite ease-in-out;
+}
+
+.orb-1 {
+  width: 400px;
+  height: 400px;
+  background: #4a90e2;
+  top: -100px;
+  left: -100px;
+}
+
+.orb-2 {
+  width: 300px;
+  height: 300px;
+  background: #8c52ff;
+  bottom: -50px;
+  right: -50px;
+  animation-delay: -5s;
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  50% {
+    transform: translate(20px, 30px);
+  }
+}
+
+/* --- Glass Card --- */
+.glass-card {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 400px;
+  /* По-тясна карта за логин/регистрация */
+  padding: 2.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* --- Typography --- */
+.brand-title {
+  font-size: 2rem;
+  font-weight: 900;
+  margin: 0;
+  text-align: center;
+  background: linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dot {
+  -webkit-text-fill-color: #4a90e2;
+}
+
+.form-title {
+  font-size: 1.25rem;
+  color: rgba(255, 255, 255, 0.9);
+  text-align: center;
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
+/* --- Form Elements --- */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: left;
+}
+
+label {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+}
+
+input {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+input:focus {
+  border-color: #4a90e2;
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+input.has-error {
+  border-color: #ff4d4d;
+}
+
+.error-text {
+  color: #ff4d4d;
+  font-size: 0.75rem;
+}
+
+/* --- Buttons --- */
+.btn {
+  padding: 0.9rem;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  width: 100%;
+}
+
+.btn-primary {
+  background: #ffffff;
+  color: #000000;
+}
+
+.btn-primary:hover {
+  background: #e0e0e0;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(255, 255, 255, 0.15);
+}
+
+.btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* --- Footer --- */
+.form-footer {
+  text-align: center;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.form-footer a {
+  color: #4a90e2;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+
+.form-footer a:hover {
+  color: #8c52ff;
+}
+
+/* --- Notification / Toast --- */
+.notification {
+  position: absolute;
+  bottom: 30px;
+  padding: 12px 24px;
+  border-radius: 50px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.notification.success {
+  background: rgba(75, 181, 67, 0.2);
+  border: 1px solid rgba(75, 181, 67, 0.5);
+  color: #4bb543;
+}
+
+.notification.error {
+  background: rgba(255, 77, 77, 0.2);
+  border: 1px solid rgba(255, 77, 77, 0.5);
+  color: #ff4d4d;
+}
+
+/* Transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.5s;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

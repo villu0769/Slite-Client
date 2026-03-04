@@ -66,9 +66,11 @@
   </div>
 </template>
 
+
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
-import FurnitureButton from './FurnitureButton.vue';  
+import FurnitureButton from './FurnitureButton.vue'; 
+import { getFurnitureCategories } from '../services/furnitureService'; // Увери се в пътя
 
 const props = defineProps({
   isOpen: { type: Boolean, required: true },
@@ -78,29 +80,69 @@ const emit = defineEmits(['close', 'start-drag']);
 const menuEl = ref(null);
 
 /* -------------------------
-   POSITION & SIZE
+   DATA (Async)
+------------------------- */
+const categories = ref([]); // Това вече идва от базата
+const isLoading = ref(false);
+
+// Зареждане при стартиране
+onMounted(async () => {
+  window.addEventListener('resize', keepInViewport);
+  try {
+    isLoading.value = true;
+    categories.value = await getFurnitureCategories();
+    categories.value = categories.value.filter(cat => cat.name!=='doors' && cat.name!=='windows'); // Филтрираме само с налични артикули
+  } catch (error) {
+    console.error("Failed to load furniture categories:", error);
+  } finally {
+    isLoading.value = false;
+  }
+});
+
+/* -------------------------
+   SELECTION LOGIC
+------------------------- */
+const selectedCategory = ref(null);
+const transitionName = ref('slide-left');
+
+// Намираме текущия обект-категория от заредения масив
+const currentCategoryObj = computed(() => 
+  categories.value.find(c => c.id === selectedCategory.value)
+);
+
+const currentCategoryLabel = computed(() => 
+  currentCategoryObj.value ? currentCategoryObj.value.name : ''
+);
+
+// Items вече са вложени вътре в категорията в базата
+const visibleItems = computed(() => 
+  currentCategoryObj.value ? currentCategoryObj.value.items : []
+);
+
+function openCategory(catId) {
+  transitionName.value = 'slide-left';
+  selectedCategory.value = catId;
+}
+
+function goBack() {
+  transitionName.value = 'slide-right';
+  selectedCategory.value = null;
+}
+
+/* -------------------------
+   POSITION, SIZE, DRAG & RESIZE
+   (Този код остава абсолютно същият като твоя оригинален)
 ------------------------- */
 const menu = reactive({
-  x: 120,
-  y: 100,
-  width: 360,
-  height: 420,
-  minWidth: 300,
-  minHeight: 200,
+  x: 120, y: 100, width: 360, height: 420, minWidth: 300, minHeight: 200,
 });
 
 const menuStyle = computed(() => ({
-  left: `${menu.x}px`,
-  top: `${menu.y}px`,
-  width: `${menu.width}px`,
-  height: `${menu.height}px`,
+  left: `${menu.x}px`, top: `${menu.y}px`, width: `${menu.width}px`, height: `${menu.height}px`,
 }));
 
 const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
 
-/* -------------------------
-   DRAGGING
-------------------------- */
 let dragging = false;
 let dragStart = { px: 0, py: 0, sx: 0, sy: 0 };
 
@@ -128,9 +170,6 @@ function stopDrag() {
   window.removeEventListener('pointerup', stopDrag);
 }
 
-/* -------------------------
-   RESIZING
-------------------------- */
 let resizing = false;
 let resizeType = null;
 let resizeStart = { px: 0, py: 0, sw: 0, sh: 0 };
@@ -176,7 +215,6 @@ function keepInViewport() {
   menu.y = clamp(menu.y, 0, window.innerHeight - rect.height);
 }
 
-onMounted(() => window.addEventListener('resize', keepInViewport));
 onBeforeUnmount(() => {
   window.removeEventListener('resize', keepInViewport);
   window.removeEventListener('pointermove', onDragMove);
@@ -184,34 +222,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointermove', onResizeMove);
   window.removeEventListener('pointerup', stopResize);
 });
-
-/* -------------------------
-   CONTENT
-------------------------- */
-const categories = [
-  { id: 'living', name: 'Living Room' },
-  { id: 'bedroom', name: 'Bedroom' },
-];
-
-const furnitureByCategory = {
-  living: [{ filename: 'sofa', name: 'Sofa', pic: 'sofa.jpg' }, { filename: 'table', name: 'Table', pic: 'table.png' },{ filename: 'simple_kitchen_cabinet', name: 'Kitchen Cabinet', pic: 'simple_kitchen_cabinet.png' },{ filename: 'sofa', name: 'Sofa', pic: 'sofa.jpg' }],
-  bedroom: [{ filename: 'bed', name: 'Bed', pic: 'bed.jpg' }, { filename: 'wardrobe', name: 'Wardrobe', pic: 'wardrobe.jpg' }],
-};
-
-const selectedCategory = ref(null);
-const transitionName = ref('slide-left');
-const currentCategoryLabel = computed(() => categories.find(x => x.id === selectedCategory.value)?.name || '');
-const visibleItems = computed(() => furnitureByCategory[selectedCategory.value] || []);
-
-function openCategory(catId) {
-  transitionName.value = 'slide-left';
-  selectedCategory.value = catId;
-}
-
-function goBack() {
-  transitionName.value = 'slide-right';
-  selectedCategory.value = null;
-}
 </script>
 
 <style>

@@ -23,7 +23,7 @@
     <button @click="useTheme().toggleTheme">
       Switch theme
     </button>
-    <WallsMenu :isOpen="wallsMenuOpen" @close="wallsMenuOpen = false" @action="onWallsAction"/>
+    <WallsMenu :isOpen="wallsMenuOpen" @close="wallsMenuOpen = false" @action="onWallsAction" :hasWalls="hasWalls" />
     <FloatingMenu :isOpen="menuOpen" @close="menuOpen = false" @start-drag="onSelectItem" />
   </aside>
 </template>
@@ -43,9 +43,9 @@ function onSelectItem(item) {
   emit('start-drag', item);
 }
 function onWallsAction(payload) {
-  // payload ще бъде: { type: 'create-room', width: 5, length: 4 }
   emit('action', payload);
 }
+
 function handleOpenWallsMenu() {
   if(!wallsMenuOpen.value) {
     if(menuOpen.value) {
@@ -55,6 +55,12 @@ function handleOpenWallsMenu() {
   wallsMenuOpen.value = !wallsMenuOpen.value;
 }
 
+defineProps({
+  hasWalls: {
+    type: Boolean,
+    required: true
+  }
+});
 </script>
 
 <style scoped>
@@ -78,7 +84,9 @@ button {
   justify-content: center;
   gap:4px;
   align-content: center;
-  background: var(--bg-soft);
+    background: color-mix(in srgb, var(--bg-soft), transparent 17%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   color: var(--text);
   border: none;
   border-radius: 6px;

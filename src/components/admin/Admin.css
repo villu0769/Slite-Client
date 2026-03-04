@@ -1,0 +1,284 @@
+.users-container {
+    padding: 20px;
+    color: var(--text);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.furniture-container {
+    padding: 20px;
+    color: var(--text);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.title-area {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.title-area h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--text);
+}
+
+.state-msg {
+    text-align: center;
+    margin-top: 50px;
+    color: var(--text);
+    padding: 20px;
+}
+
+.state-msg.error {
+    color: red;
+}
+
+/* --- Table --- */
+.table-responsive {
+    overflow-x: auto;
+}
+
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg);
+    border-radius: 8px;
+    overflow: hidden;
+    border: var(--border);
+}
+
+.users-table th,
+.users-table td {
+    padding: 16px;
+    text-align: left;
+    border-bottom: var(--border);
+}
+
+.users-table th {
+    background: var(--bg);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+    color: var(--text);
+}
+
+.id-col {
+    font-family: monospace;
+    color: var(--text);
+}
+
+.clickable-row {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.clickable-row:hover {
+    background-color: var(--bg-soft);
+}
+
+.actions-col {
+    text-align: right;
+}
+
+/* --- Badges --- */
+.role-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.role-badge.admin { 
+    background: rgba(255, 99, 71, 0.2); 
+    color: #ff6347; 
+    border: 1px solid rgba(255, 99, 71, 0.4); 
+}
+
+.role-badge.user { 
+    background: rgba(74, 144, 226, 0.2); 
+    color: #4a90e2; 
+    border: 1px solid rgba(74, 144, 226, 0.4); 
+}
+
+/* --- Buttons --- */
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: opacity 0.2s, transform 0.1s;
+}
+
+.btn:hover { opacity: 0.9; }
+.btn:active { transform: scale(0.98); }
+
+.btn-primary { 
+    background-color: var(--bg);
+    color: #fff;
+    border: var(--border);
+}
+
+.btn-secondary { 
+    background-color: var(--bg-soft);
+    color: var(--text);
+    border: var(--border);
+}
+
+.btn-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-edit { 
+    background-color: red;
+    color: #000; 
+    margin-right: 8px; 
+    padding: 4px 8px; 
+    font-size: 0.8rem;
+}
+
+.btn-delete { 
+    background-color: red;
+    color: white; 
+    padding: 6px 12px; 
+    font-size: 0.8rem;
+}
+
+/* --- Modal --- */
+.modal-backdrop {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.glass-modal {
+    background: var(--bg);
+    border: var(--border);
+    padding: 2rem;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 450px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: var(--text);
+}
+
+.btn-close {
+    background: none;
+    border: none;
+    color: var(--text);
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.form-group { 
+    margin-bottom: 15px; 
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+    color: var(--text);
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: var(--border);
+    background: var(--bg-soft);
+    color: var(--text);
+    outline: none;
+    box-sizing: border-box;
+}
+
+.form-group input[type="file"] {
+    padding: 8px;
+    font-size: 0.85rem;
+}
+
+.form-group input:focus {
+    border-color: var(--text);
+}
+
+.password-group { 
+    display: flex; 
+    gap: 8px; 
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.pagination-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin-top: 20px;
+    color: var(--text);
+}
+
+.error-msg {
+    color: red;
+    margin-top: 10px;
+    text-align: right;
+    font-size: 0.9rem;
+}
+
+/* Специфични за мебелите */
+.item-thumb {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: var(--border);
+}
+
+.no-thumb {
+    display: inline-block;
+    width: 50px;
+    height: 50px;
+    line-height: 50px;
+    text-align: center;
+    background: var(--bg-soft);
+    border-radius: 4px;
+    font-size: 0.7rem;
+    color: var(--text);
+    border: var(--border);
+}

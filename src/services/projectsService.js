@@ -1,6 +1,7 @@
+const API_URL = "https://slite-api.onrender.com";
 
 export const fetchAll = async () => {
-  const response = await fetch("http://localhost:5000/api/projects/", {
+  const response = await fetch(`${API_URL}/api/projects/`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -17,7 +18,7 @@ export const fetchAll = async () => {
   return result.data;
 };
 export const createNew = async (name) => {
-  const response = await fetch("http://localhost:5000/api/projects/", {
+  const response = await fetch(`${API_URL}/api/projects/`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -36,7 +37,7 @@ export const createNew = async (name) => {
 };
 
 export const getProjectById = async (projectId) => {
-  const response = await fetch(`http://localhost:5000/api/projects/${projectId}`, {
+  const response = await fetch(`${API_URL}/api/projects/${projectId}`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -58,7 +59,7 @@ export async function updateProjectName(projectId, name) {
     throw new Error('Project name must be a non-empty string');
   }
 
-  const response = await fetch(`http://localhost:5000/api/projects/${projectId}/name`, {
+  const response = await fetch(`${API_URL}/api/projects/${projectId}/name`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
