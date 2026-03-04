@@ -62,7 +62,7 @@ const deleteProject = async () => {
 
   try {
     // 2. Изпращаме заявка към Backend-a
-    const response = await fetch(`http://localhost:5000/api/projects/${id}/delete`, {
+    const response = await fetch(`https://slite-api.onrender.com/api/projects/${id}/delete`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

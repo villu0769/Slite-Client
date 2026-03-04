@@ -3,7 +3,7 @@
         class="item-btn"
         @pointerdown.prevent="$emit('start-drag', item)"
     >
-        <img :src="`/src/assets/${item.pic}`" :alt="item.name" class="item-image" />
+        <img :src="item.pic" :alt="item.name" class="item-image" />
         <span class="item-name">{{ item.name }}</span>
     </button>
 </template>

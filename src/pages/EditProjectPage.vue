@@ -16,7 +16,7 @@
     </div>
   <div id="content">
     <Sidebar @start-drag="onStartDragFromMenu" @action="handleSidebarAction" :hasWalls="hasWalls"/>
-    <EditProject v-if="projectData" :projectData="projectData" ref="editProjectRef" />
+    <EditProject v-if="projectData" :projectData="projectData" ref="editProjectRef" @has-walls="handleWallsUpdate" />
   </div>
 
 </template>
@@ -36,25 +36,40 @@ function goBack() {
   router.push('/projects');
 }
 const editProjectRef = ref(null);
-var hasWalls=editProjectRef.value?.hasWalls;
+const hasWalls = ref(false);
+
+function handleWallsUpdate(value) {
+  hasWalls.value = value;
+}
 
 function onStartDragFromMenu(item) {
   // forward to EditProject's method
   editProjectRef.value?.startDragFromMenu(item);
 }
 function handleSidebarAction(payload) {
-  // Проверяваме типа на действието
-  if (payload && payload.type === 'create-room') {
-    // Извикваме createRoom от EditProject.vue
-    // payload.width и payload.length идват от WallsMenu input-ите
-    editProjectRef.value?.createRoom(payload.width, payload.length);
+  // Проверка за безопасност
+  if (!payload) return;
+
+  // 1. Ако създаваме стая
+  if (payload.type === 'create-room') {
+    editProjectRef.value?.createRoom(payload.width, payload.length,payload.height);
   } 
-  
-  // Тук можеш да добавиш else if за други инструменти (стени, врати)
+  else if (payload.type === 'create-wall') {
+    editProjectRef.value?.createWall(payload.length, payload.height);
+  }
+  // 2. Ако добавяме врата (НОВОТО)
+  else if (payload.type === 'add-model-door') {
+    // Извикваме новата функция в EditProject.vue и подаваме целия payload
+    // (защото в payload-а има width, height, modelUrl)
+    editProjectRef.value?.addDoorToWallCenter(payload);
+  }
+else if (payload.type === 'add-model-window') {
+    editProjectRef.value?.addWindowToWallCenter(payload);
+  }
+  // 3. Ако е просто текст (напр. 'add-wall-brick' или други стари бутони)
   else if (typeof payload === 'string') {
-     // Ако е string (напр. 'add-wall-brick'), можеш да го подадеш на друга функция
-     // console.log("Избран инструмент:", payload);
-     // editProjectRef.value?.activateTool(payload); // (ако имаш такава)
+    console.log('Simple action:', payload);
+    // Тук може да добавиш логика за старите бутони, ако още ги ползваш
   }
 }
 // route

@@ -1,43 +1,5 @@
-.walls-btn{
-    display: flex;
-    justify-content: space-evenly;
-    align-content: center;
-    width: 145px;
-    height:55px;
-    padding: 7px 0 1px 0;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background-color: var(--bg);
-    cursor: pointer;
-    color: color-mix(in srgb, var(--text), transparent 10%);
-    fill:var(--text);
-    fill-opacity: 0.85;
-    transition: background-color 0.3s, box-shadow 0.3s;
-}
-.walls-btn span{
-    height: 100%;
-    padding-top:7px ;
-    font-weight: 650;
-}
-.buttons-grid{
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    padding: 7px;
-    gap:10px;
-}
 
-.cat-label-wrap {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.cat-icon {
-  display: flex;
-  align-items: center;
-  color: var(--accent);
-}
-
+/* --- GRID LAYOUTS --- */
 .tools-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
@@ -45,6 +7,7 @@
   padding-bottom: 20px;
 }
 
+/* --- BUTTONS & TOOLS --- */
 .tool-btn {
   display: flex;
   flex-direction: column;
@@ -57,8 +20,10 @@
   border-radius: 12px;
   padding: 10px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   color: var(--text);
+  position: relative;
+  overflow: hidden;
 }
 
 .tool-btn:hover {
@@ -71,8 +36,12 @@
 .tool-icon {
   width: 32px;
   height: 32px;
-  color: var(--text);
+  color: var(--text); /* Default color */
   opacity: 0.8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
 }
 
 .tool-btn:hover .tool-icon {
@@ -87,8 +56,47 @@
   line-height: 1.2;
 }
 
-/* ROOM FORM STYLES */
-.room-form {
+/* --- IMAGES IN BUTTONS (New) --- */
+.preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+/* --- CATEGORY LIST ITEMS --- */
+.cat-label-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cat-icon {
+  display: flex;
+  align-items: center;
+  color: var(--accent);
+}
+
+.category-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(100%);
+  background: rgba(0,0,0,0.05);
+  transform: none;
+  box-shadow: none;
+  border-color: transparent;
+}
+
+.category-btn:disabled:hover {
+  background: rgba(0,0,0,0.05);
+  border-color: transparent;
+  transform: none;
+  box-shadow: none;
+}
+
+/* --- FORMS (Room & Doors) --- */
+.room-form,
+.doors-form {
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -129,13 +137,13 @@
 .create-btn {
   margin-top: 8px;
   background: var(--accent);
-  color: white;
+  color: white; /* Always white for contrast on accent */
   border: none;
   padding: 12px;
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s, transform 0.1s;
 }
 
 .create-btn:hover {
@@ -146,20 +154,56 @@
   transform: scale(0.98);
 }
 
-.category-btn:disabled {
-  opacity: 0.5;              /* Прави го полупрозрачен */
-  cursor:auto;       /* Показва забранителен знак на мишката */
-  filter: grayscale(100%);   /* (Опционално) Прави иконата сива */
-  background: rgba(0,0,0,0.05); /* Лек фон, за да се вижда, че е там */
-  transform: none;           /* Спира подскачането */
-  box-shadow: none;          /* Маха сянката */
-  border-color: transparent; /* Маха бордера */
+/* --- DOORS SPECIFIC (New) --- */
+.doors-panel {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  /* Custom scrollbar for webkit */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
 }
 
-/* Гарантираме, че при ховър нищо не се случва */
-.category-btn:disabled:hover {
-  background: rgba(0,0,0,0.05);
-  border-color: transparent;
-  transform: none;
-  box-shadow: none;
+.config-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 5px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.selected-model-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.small-back {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--bg-soft);
+  color: var(--text);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.small-back:hover {
+  background: var(--border);
+}
+
+/* --- ANIMATIONS --- */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
