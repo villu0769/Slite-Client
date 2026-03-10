@@ -25,16 +25,14 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import Dashboard from '../components/admin/Dashboard.vue';
 import Users from '../components/admin/Users.vue';
 import FurnitureModelsManager from '../components/admin/FurnitureModelsManager.vue';
 import { useTheme } from '../composables/useTheme';
 
 // 2. State (замества data())
-const activeMenu = ref('dashboard');
+const activeMenu = ref('users');
 
 const menuItems = [
-  { id: 'dashboard', label: 'Dashboard' },
   { id: 'users', label: 'Users' },
   {id: 'models', label: 'Furniture Models Manager'}
 ];
@@ -42,7 +40,6 @@ const menuItems = [
 // 3. Computed (замества computed property)
 const currentComponent = computed(() => {
   const componentMap = {
-    dashboard: Dashboard,
     users: Users,
     models: FurnitureModelsManager
   };
@@ -62,7 +59,7 @@ const currentComponent = computed(() => {
 }
 
 .drawer {
-  width: 250px;
+  width: 290px;
   /* Използвай CSS променливи, които се сменят от useTheme */
   background: var(--bg); 
   border-right:var(--border);

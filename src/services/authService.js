@@ -37,6 +37,28 @@ export const registerUser = async ({email,username,password,role='user'}) => {
   return { token, user };
 };
 
+export const verifyToken = async () =>{
+  const token = localStorage.getItem('token');
+  if (!token) return;
+
+  try {
+    const response = await fetch(`${API_URL}/api/auth/verify`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}` 
+      }
+    });
+
+    const data = await response.json();
+
+    if (!data.isValid) {
+      localStorage.removeItem('token');
+    }
+  } catch (error) {
+    console.error('Грешка при проверка на токена:', error);
+  }
+}
+
 export const loginUser = async ({email,password}) => {
   const response = await fetch(`${API_URL}/api/auth/login`, {
     method: "POST",

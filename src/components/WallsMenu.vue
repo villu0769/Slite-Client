@@ -63,6 +63,10 @@
               <label>Height (m)</label>
               <input type="number" v-model.number="roomSize.height" min="1" step="0.5" />
             </div>
+            <div class="input-group">
+              <label>Дебелина на стените (м)</label>
+              <input type="number" v-model.number="roomSize.thickness" min="0.05" step="0.05" />
+            </div>
             <button class="create-btn" @click="handleCreateRoom">
               Create Room
             </button>
@@ -76,6 +80,10 @@
             <div class="input-group">
               <label>Height (m)</label>
               <input type="number" v-model.number="wallConfig.height" min="1" step="0.1" />
+            </div>
+            <div class="input-group">
+              <label>Дебелина на стената (м)</label>
+              <input type="number" v-model.number="roomSize.thickness" min="0.05" step="0.05" />
             </div>
             <button class="create-btn" @click="handleCreateWall">
               Create Wall
@@ -181,7 +189,7 @@
 </template>
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
-import {getCategoryByName} from '../services/furnitureService'
+import {getNonFurnitureCategory} from '../services/furnitureService'
 // --- PROPS & EMITS ---
 const props = defineProps({
   isOpen: { type: Boolean, required: true },
@@ -192,8 +200,8 @@ const emit = defineEmits(['close', 'action']);
 const menuEl = ref(null);
 
 // --- DATA: Room Form State ---
-const roomSize = reactive({ width: 5, length: 4, height: 2.6 });
-const wallConfig = reactive({ length: 3.0, height: 2.6 });
+const roomSize = reactive({ width: 5, length: 4, height: 2.6 ,thickness: 0.2});
+const wallConfig = reactive({ length: 3.0, height: 2.6 ,thickness: 0.2});
 
 // --- DATA: Dynamic Models (Doors & Windows) ---
 const doorModels = ref([]);
@@ -203,13 +211,13 @@ const selectedDoorModel = ref(null);
 const doorConfig = reactive({ width: 0.9, height: 2.1 });
 
 const selectedWindowModel = ref(null);
-const windowConfig = reactive({ width: 1.2, height: 1.5 });
+const windowConfig = reactive({ width: 1.2, height: 1.5, heightFromFloor: 1.0 });
 
 // Функция за изтегляне на моделите от бекенда
 async function fetchModels() {
   try {
     // ВАЖНО: Смени пътя, ако твоят endpoint за категории е друг!
-    const doorsCat = await getCategoryByName('doors');
+    const doorsCat = await getNonFurnitureCategory('doors');
 
     if (doorsCat && doorsCat.items) {
       doorModels.value = doorsCat.items.map(item => ({
@@ -221,7 +229,7 @@ async function fetchModels() {
     }
 
     // Търсим категория 'windows'
-    const windowsCat = await getCategoryByName('windows');
+    const windowsCat = await getNonFurnitureCategory('windows');
     if (windowsCat && windowsCat.items) {
       windowModels.value = windowsCat.items.map(item => ({
         id: item.filename,
@@ -244,8 +252,6 @@ onMounted(() => {
 // --- SELECTION LOGIC ---
 function selectDoorModel(model) {
   selectedDoorModel.value = model;
-  doorConfig.width = model.defaultWidth;
-  doorConfig.height = 2.1;
 }
 
 function clearDoorSelection() {
@@ -254,8 +260,6 @@ function clearDoorSelection() {
 
 function selectWindowModel(model) {
   selectedWindowModel.value = model;
-  windowConfig.width = model.defaultWidth;
-  windowConfig.height = 1.5; // Default height for window
 }
 
 function clearWindowSelection() {
@@ -328,7 +332,8 @@ function handleCreateRoom() {
     type: 'create-room',
     width: roomSize.width,
     length: roomSize.length,
-    height: roomSize.height
+    height: roomSize.height,
+    thickness: roomSize.thickness
   });
 }
 
@@ -336,7 +341,8 @@ function handleCreateWall() {
   emit('action', {
     type: 'create-wall',
     length: wallConfig.length,
-    height: wallConfig.height
+    height: wallConfig.height,
+    thickness: wallConfig.thickness
   });
 }
 

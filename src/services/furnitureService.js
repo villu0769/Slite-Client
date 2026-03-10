@@ -18,8 +18,8 @@ export const getFurnitureCategories = async () => {
   return result.data;
 };
 
-export const getCategoryByName = async (name) => {
-  const response = await fetch(`${API_URL}/api/furniture-categories/${name}`, {
+export const getNonFurnitureCategory = async (id) => {
+  const response = await fetch(`${API_URL}/api/furniture-categories/${id}`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
@@ -62,12 +62,11 @@ export async function addFurnitureItem(categoryId, name, picFile, modelFile) {
 }
 
 export async function addFurnitureCategory(name) {
-  const newId = name.toLowerCase().replace(/\s+/g, '_');
-  
+
   const response = await fetch(`${API_URL}/api/furniture-categories/add-category`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: newId, name: name })
+    body: JSON.stringify({  name: name })
   });
 
   const result = await response.json();
@@ -97,7 +96,7 @@ export async function deleteFurnitureCategory(id) {
 
 export async function deleteFurnitureItem(categoryId, itemName) {
 
-  const response = await fetch(`${API_URL}/api/furniture-categories/${categoryId}/${itemName}`, {
+  const response = await fetch(`${API_URL}/api/furniture-categories/${categoryId}/${encodeURIComponent(itemName)}`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
   });

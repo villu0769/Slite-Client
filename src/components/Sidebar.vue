@@ -1,6 +1,6 @@
 <template>
   <aside class="sidebar">
-    <button @click="menuOpen = !menuOpen">
+    <button @click="handleOpenFurnitureMenu">
       Furniture
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512">
         <path
@@ -53,6 +53,15 @@ function handleOpenWallsMenu() {
     }
   }
   wallsMenuOpen.value = !wallsMenuOpen.value;
+}
+
+function handleOpenFurnitureMenu() {
+  if(!menuOpen.value) {
+    if(wallsMenuOpen.value) {
+      wallsMenuOpen.value = false;
+    }
+  }
+  menuOpen.value = !menuOpen.value;
 }
 
 defineProps({

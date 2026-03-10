@@ -32,7 +32,7 @@
               </span>
             </td>
             <td>
-              <button class="btn btn-delete" @click="handleDeleteUser(user._id)">Delete</button>
+              <button v-if="user.role !== 'admin'"  class="btn btn-delete" @click="handleDeleteUser(user._id)">Delete</button>
             </td>
           </tr>
         </tbody>

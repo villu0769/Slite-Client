@@ -48,18 +48,31 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router'; // Предполагам, че ползваш router
+import { verifyToken } from '../services/authService';
 
 const router = useRouter();
 const hasToken = ref(false);
 
+
+const checkAuth = async () => {
+    try {
+      await verifyToken();
+    } catch (err) {
+      console.error('Token verification failed:', err);
+    }
+    const token = localStorage.getItem('token');
+    hasToken.value = !!token;
+  };
+
 onMounted(() => {
-  // Проверка за токен (примерно в localStorage)
-  const token = localStorage.getItem('token'); // Промени ключа според твоята логика
-  hasToken.value = !!token;
+  checkAuth();
 });
 
 // Навигационни функции
-const goToApp = () => router.push('/projects'); // Пътят към основното приложение
+const goToApp = () => {
+  if (localStorage.getItem('role') === 'admin') router.push('/admin');
+  else router.push('/projects');
+}
 const goToLogin = () => router.push('/login');
 const goToRegister = () => router.push('/register');
 const logout = () => {
@@ -72,18 +85,19 @@ const logout = () => {
 <style scoped>
 /* --- 1. Fonts & Reset --- */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700;900&display=swap');
+
 .home-container {
   font-family: 'Inter', sans-serif;
   width: 100vw;
   height: 100vh;
-  
+
   /* ПРОМЯНА: Разрешаваме скролването вертикално */
-  overflow-y: auto; 
-  
+  overflow-y: auto;
+
   /* ПРОМЯНА: Скриване на скролбара за Firefox */
-  scrollbar-width: none; 
+  scrollbar-width: none;
   /* ПРОМЯНА: Скриване на скролбара за IE и Edge */
-  -ms-overflow-style: none; 
+  -ms-overflow-style: none;
 
   background-color: #0f1115;
   background-image:
@@ -214,10 +228,10 @@ const logout = () => {
 
 /* --- 5. Buttons --- */
 .auth-buttons {
-  display: flex;  
+  display: flex;
   position: absolute;
   top: 20px;
-right:20px;
+  right: 20px;
   gap: 1rem;
   justify-content: center;
 }
@@ -258,7 +272,7 @@ right:20px;
 .welcome-back {
   font-size: 0.9rem;
   color: rgba(255, 255, 255, 0.5);
-  margin-bottom: 0.5rem;
+  margin-bottom: 2rem;
 }
 
 .arrow-icon {

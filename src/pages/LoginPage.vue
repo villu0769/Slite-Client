@@ -12,25 +12,15 @@
       <form @submit.prevent="onSubmit" class="auth-form">
         <div class="input-group">
           <label for="email">Имейл</label>
-          <input 
-            type="email" 
-            id="email" 
-            v-model="form.email" 
-            :class="{ 'has-error': errors.email }"
-            placeholder="name@example.com"
-          />
+          <input type="email" id="email" v-model="form.email" :class="{ 'has-error': errors.email }"
+            placeholder="name@example.com" />
           <span v-if="errors.email" class="error-text">{{ errors.email }}</span>
         </div>
 
         <div class="input-group">
           <label for="password">Парола</label>
-          <input 
-            type="password" 
-            id="password" 
-            v-model="form.password" 
-            :class="{ 'has-error': errors.password }"
-            placeholder="••••••••"
-          />
+          <input type="password" id="password" v-model="form.password" :class="{ 'has-error': errors.password }"
+            placeholder="••••••••" />
           <span v-if="errors.password" class="error-text">{{ errors.password }}</span>
         </div>
 
@@ -88,8 +78,8 @@ const validate = () => {
   errors.email = !form.email
     ? 'Имейлът е задължителен'
     : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)
-    ? 'Моля въведете валиден имейл'
-    : ''
+      ? 'Моля въведете валиден имейл'
+      : ''
 
   errors.password = !form.password ? 'Паролата е задължителна' : ''
 
@@ -102,11 +92,13 @@ const mutation = useMutation(loginUser, {
     // Запазване на токена и ролята
     localStorage.setItem('token', data.token)
     localStorage.setItem('role', data.user.role)
-    
+
     showNotification('Успешен вход! Пренасочване...', 'success')
-    
+
     // Леко забавяне преди редирект за по-добър UX
-    setTimeout(() => router.push('/projects'), 1500)
+    setTimeout(() => {
+      if (localStorage.getItem('role') === 'admin') router.push('/admin'); else router.push('/projects');
+    }, 1500);
   },
   onError: (err) => {
     const msg = err.response?.data?.message || err.message || 'Грешен имейл или парола'
@@ -149,12 +141,34 @@ const onSubmit = () => {
   z-index: 1;
   animation: float 10s infinite ease-in-out;
 }
-.orb-1 { width: 400px; height: 400px; background: #4a90e2; top: -100px; left: -100px; }
-.orb-2 { width: 300px; height: 300px; background: #8c52ff; bottom: -50px; right: -50px; animation-delay: -5s; }
+
+.orb-1 {
+  width: 400px;
+  height: 400px;
+  background: #4a90e2;
+  top: -100px;
+  left: -100px;
+}
+
+.orb-2 {
+  width: 300px;
+  height: 300px;
+  background: #8c52ff;
+  bottom: -50px;
+  right: -50px;
+  animation-delay: -5s;
+}
 
 @keyframes float {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(20px, 30px); }
+
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  50% {
+    transform: translate(20px, 30px);
+  }
 }
 
 /* --- Glass Card --- */
@@ -185,7 +199,10 @@ const onSubmit = () => {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
-.dot { -webkit-text-fill-color: #4a90e2; }
+
+.dot {
+  -webkit-text-fill-color: #4a90e2;
+}
 
 .form-title {
   font-size: 1.5rem;
@@ -319,7 +336,7 @@ input.has-error {
   font-size: 0.9rem;
   font-weight: 500;
   backdrop-filter: blur(10px);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
   z-index: 100;
 }
 
@@ -336,6 +353,13 @@ input.has-error {
 }
 
 /* Transitions */
-.fade-enter-active, .fade-leave-active { transition: opacity 0.5s; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.5s;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 </style>

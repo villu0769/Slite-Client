@@ -1,48 +1,65 @@
 import * as THREE from 'three';
-
 /**
  * Сменя текстурата на обект и синхронизира със стейта
  */
-export async function handleTextureChange(object, textureFilename, options = {}) {
-  const {
-    tiling = { x: 1, y: 1 },
-    // isRoomObject,          
-    // updateRoomEntry,       
-    // saveChanges
-  } = options;
+export async function handleTextureChange(object, textureFilename) {
 
   if (!object || !textureFilename) return;
 
   const loader = new THREE.TextureLoader();
-  
+
   try {
     const texture = await loader.loadAsync(`/app/pics/textures/${textureFilename}`);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(tiling.x, tiling.y);
+    texture.repeat.set(1, 1);
     texture.colorSpace = THREE.SRGBColorSpace;
 
-    // Защитна функция - проверява дали материалът изобщо съществува
-    const applyToMaterial = (mat) => {
-      if (!mat) return; 
-      mat.map = texture;
-      mat.needsUpdate = true;
-    };
-
-    // ВАЖНО: Обхождаме обекта, в случай че е THREE.Group
+    // --- ОБХОЖДАНЕ И ПОДМЯНА НА МАТЕРИАЛИ ---
     object.traverse((child) => {
       if (child.isMesh && child.material) {
+
+        // Помощна функция за безопасна подмяна
+        const applyToMaterialSafely = (mat, index = null) => {
+          if (!mat) return;
+
+          // 1. ПРОВЕРКА ЗА СТЪКЛО И МЕТАЛ
+          const matName = (mat.name || '').toLowerCase();
+
+          const isGlass = matName.includes('glass') || (mat.transparent === true && mat.opacity < 1);
+          const isMetal = matName.includes('metal') || matName.includes('chrome') || matName.includes('steel') || matName.includes('aluminum');
+
+          // Ако е стъкло или метал, директно прекъсваме и не пипаме този материал
+          if (isGlass || isMetal) return;
+          // 2. КЛОНИРАНЕ (За да не променяме всички инстанции на този модел в сцената)
+          const newMat = mat.clone();
+          newMat.map = texture;
+          newMat.needsUpdate = true;
+          if (newMat.color) {
+            newMat.color.setHex(0xffffff);
+          }
+          newMat.metalness = 0.1; 
+          newMat.roughness = 0.5;
+          // 3. ПРИЛАГАНЕ НА НОВИЯ МАТЕРИАЛ
+          if (index !== null) {
+            child.material[index] = newMat; // Ако е масив от материали
+          } else {
+            child.material = newMat;        // Ако е единичен материал
+          }
+        };
+
         if (Array.isArray(child.material)) {
-          child.material.forEach(applyToMaterial);
+          // Важно: Правим плитко копие на масива, за да можем да подменяме елементи в него
+          child.material = [...child.material];
+          child.material.forEach((mat, idx) => applyToMaterialSafely(mat, idx));
         } else {
-          applyToMaterial(child.material);
+          applyToMaterialSafely(child.material);
         }
       }
     });
 
-    // Записваме метаданните в главния обект
-    object.userData.textureUrl = textureFilename;
-    object.userData.tiling = tiling;
+    // --- ЗАПАЗВАНЕ В СТЕЙТА НА ОБЕКТА ---
+    object.userData.texture = textureFilename;
 
     return texture;
   } catch (error) {

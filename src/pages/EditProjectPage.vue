@@ -52,10 +52,10 @@ function handleSidebarAction(payload) {
 
   // 1. Ако създаваме стая
   if (payload.type === 'create-room') {
-    editProjectRef.value?.createRoom(payload.width, payload.length,payload.height);
+    editProjectRef.value?.createRoom(payload.width, payload.length,payload.height,payload.thickness);
   } 
   else if (payload.type === 'create-wall') {
-    editProjectRef.value?.createWall(payload.length, payload.height);
+    editProjectRef.value?.createWall(payload.length, payload.height,payload.thickness);
   }
   // 2. Ако добавяме врата (НОВОТО)
   else if (payload.type === 'add-model-door') {

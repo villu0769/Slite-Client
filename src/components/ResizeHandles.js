@@ -76,10 +76,10 @@ export function createResizeHandles(wall, scene) {
 export function updateHandlePositions(wall) {
     if (!resizeLeftHandle || !resizeRightHandle || !wall) return;
 
-    // A. Calculate Width taking SCALE into account
-    // (This was likely why they were invisible - they were inside the wall)
-    const currentScale = wall.scale.x || 1; 
-    const width = wall.userData.dimensions.width * currentScale; 
+    // A. ВЗИМАМЕ АБСОЛЮТНАТА СТОЙНОСТ НА МАЩАБА!
+    // Така ширината винаги е положителна и хендълите не си разменят местата.
+    const currentScale = Math.abs(wall.scale.x || 1); 
+    const width = wall.userData.dimensions.width * currentScale;
     
     // B. Get Wall's World Data
     const wallPos = new THREE.Vector3();

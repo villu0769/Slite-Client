@@ -29,9 +29,9 @@
         <div v-if="!selectedCategory" key="categories" class="category-list">
           <button
             v-for="cat in categories"
-            :key="cat.id"
+            :key="cat._id"
             class="category-btn"
-            @click="openCategory(cat.id)"
+            @click="openCategory(cat._id)"
           >
             {{ cat.name }}
             <svg class="chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -91,7 +91,7 @@ onMounted(async () => {
   try {
     isLoading.value = true;
     categories.value = await getFurnitureCategories();
-    categories.value = categories.value.filter(cat => cat.name!=='doors' && cat.name!=='windows'); // Филтрираме само с налични артикули
+    categories.value = categories.value.filter(cat => !cat.non_furniture_type); // Филтрираме само с налични артикули
   } catch (error) {
     console.error("Failed to load furniture categories:", error);
   } finally {
@@ -107,7 +107,7 @@ const transitionName = ref('slide-left');
 
 // Намираме текущия обект-категория от заредения масив
 const currentCategoryObj = computed(() => 
-  categories.value.find(c => c.id === selectedCategory.value)
+  categories.value.find(c => c._id === selectedCategory.value)
 );
 
 const currentCategoryLabel = computed(() => 

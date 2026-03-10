@@ -30,7 +30,7 @@
             <td class="id-col">{{ cat._id }}</td>
             <td>{{ cat.items ? cat.items.length : 0 }}</td>
             <td class="actions-col" @click.stop>
-              <button class="btn btn-delete" @click="deleteCategory(cat._id)" title="Delete Category">
+              <button v-if="!cat.non_furniture_type" class="btn btn-delete" @click="deleteCategory(cat._id)" title="Delete Category">
                 Delete
               </button>
             </td>
@@ -57,7 +57,7 @@
             <td><strong>{{ item.name }}</strong></td>
             <td class="id-col">{{ item.filename }}</td>
             <td class="actions-col">
-              <button class="btn btn-delete" @click="deleteItem(selectedCategory,item.filename)" title="Delete Item">
+              <button  class="btn btn-delete" @click="deleteItem(selectedCategory,item.filename)" title="Delete Item">
                 Delete
               </button>
             </td>
