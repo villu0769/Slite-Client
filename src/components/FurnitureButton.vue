@@ -63,7 +63,7 @@ export default {
 
 .item-image {
   width: 100%;
-  height: 80px;
+  height: 95px;
   object-fit: cover; /* Промених на contain, за да се вижда цялата мебел */
   border-top-left-radius: 8px;border-top-right-radius: 8px;
   pointer-events: none; /* Важно: предотвратява влаченето на самата картинка вместо бутона */

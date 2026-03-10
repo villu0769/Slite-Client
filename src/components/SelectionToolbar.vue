@@ -13,21 +13,21 @@
 
     <div class="divider"></div>
 
-    <button class="toolbar-btn" @click="$emit('rotate', -90)" title="Rotate Left">
+    <button v-if="objType!=='window' && objType!=='door'" class="toolbar-btn" @click="$emit('rotate', -90)" title="Rotate Left">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
         <path d="M3 3v5h5"></path>
       </svg>
     </button>
 
-    <button class="toolbar-btn" @click="$emit('rotate', 90)" title="Rotate Right">
+    <button v-if="objType!=='window' && objType!=='door'" class="toolbar-btn" @click="$emit('rotate', 90)" title="Rotate Right">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
         <path d="M21 3v5h-5"></path>
       </svg>
     </button>
 
-    <div class="divider"></div>
+    <div v-if="objType!=='window' && objType!=='door'" class="divider"></div>
 
     <button class="toolbar-btn" @click="$emit('flip', 'x')" title="Flip Horizontal">
        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.59 18.512l1.41-1.415L23.113 12l-4.113-5.097-1.41 1.415L20.285 12l-2.695 6.512zM12 2v20M6.41 18.512l-1.41-1.415L.887 12l4.113-5.097 1.41 1.415L3.715 12l2.695 6.512z"/></svg>
@@ -57,7 +57,11 @@ defineProps({
   position: {
     type: Object,
     default: () => ({ x: 0, y: 0 })
+  },
+  objType: {
+    type: String
   }
+
 });
 
 defineEmits(['duplicate', 'rotate', 'flip', 'ground', 'delete']);

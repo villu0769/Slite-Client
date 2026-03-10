@@ -1,47 +1,95 @@
 <template>
-  <v-container class="fill-height d-flex align-center justify-center">
-    <v-row class="mx-auto" style="max-width: 900px;">
-      <v-col cols="12">
-        <v-card
-          elevation="12"
-          class="pa-6 text-center"
-          :style="{ padding: cardPadding }"
-        >
-          <v-card-text>
-            <div
-              class="title-desc"
-              :style="{ fontSize: fontSize, marginBottom: marginBottom }"
-            >
-              You don't have the rights to visit this page.
-            </div>
-          </v-card-text>
+  <div class="unauthorized-container">
+    <div class="content-box">
+      <div class="icon-wrapper">
+        <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      </div>
+      
+      <h1 class="title">Достъпът е отказан</h1>
+      <p class="subtitle">
+        Изглежда нямате необходимите права, за да разгледате тази страница, или сесията ви е изтекла.
+      </p>
 
-          <v-btn
-            color="primary"
-            class="mt-4"
-            @click="onBack"
-            style="width: fit-content;"
-          >
-            Back to Login
-          </v-btn>
-        </v-card>
-      </v-col>
-    </v-row>
-  </v-container>
+      <div class="actions">
+        <router-link to="/" class="btn secondary-btn">
+          Към началната страница
+        </router-link>
+      </div>
+    </div>
+  </div>
 </template>
 
-<script setup>
-import { computed } from 'vue'
+<style scoped>
+.unauthorized-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: var(--bg); /* Тъмен фон */
+  color: var(--text);
+  font-family: 'Inter', sans-serif; /* Или твоят основен шрифт */
+  padding: 20px;
+}
 
-const props = defineProps({
-  onBack: {
-    type: Function,
-    required: true,
-  },
-})
+.content-box {
+  text-align: center;
+  max-width: 400px;
+  background: var(--bg-soft);
+  padding: 40px 30px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(200, 200,255, 0.1);
+}
 
-// Responsive styles
-const cardPadding = computed(() => '36px') // adjust as needed
-const fontSize = computed(() => '30px') // adjust responsive logic if desired
-const marginBottom = computed(() => '40px')
-</script>
+.icon-wrapper {
+  color: #ff4757; /* Червен акцент за грешка/забрана */
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #ffffff;
+}
+
+.subtitle {
+  font-size: 0.95rem;
+  color: #a0a0a0;
+  margin-bottom: 30px;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn {
+  display: inline-block;
+  padding: 17px 20px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+}   
+
+
+.secondary-btn {
+  background :var(--bg);
+  opacity: 0.8;
+  color: var(--text);
+}
+
+.secondary-btn:hover {
+  background-color: var(--bg-soft);
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.5);
+}
+</style>

@@ -1,27 +1,22 @@
 import { getGLTFLoader } from '../services/gltfLoader'
+import { handleTextureChange } from '../composables/textureManager' 
 
 import * as THREE from 'three';
 const API_URL = "https://slite-api.onrender.com";
 
-export const loadLayout = async (layoutData, manager, maxHeight, scene, perspectiveCamera, controls, planeSize,hasWalls) => {
+export const loadLayout = async (layoutData, manager, maxHeight, scene, perspectiveCamera, controls, planeSize, hasWalls) => {
   if (!Array.isArray(layoutData) || layoutData.length === 0) return;
 
   const loader = getGLTFLoader(manager);
- 
+
   await Promise.all(
     layoutData.map(async (item) => {
       // --- СТАРА ЧАСТ: Зареждане на мебели (.glb) ---
       try {
-        const modelUrl = `/app/models/${item.filename}.glb`;
+        const modelUrl = item.filename;
 
         // Зареждаме директно от URL-а
         const gltf = await loader.loadAsync(modelUrl);
-
-        // Центриране (ако е правено при drop)
-        // ВАЖНО: Ако при drop logic-а сте ползвали box center offset, тук може да има леко разминаване, 
-        // но обикновено записаната позиция в layoutData вече е коригираната world position.
-        // Затова тук може би НЕ трябва да вадим центъра отново, ако позицията е финална.
-        // Но ако старата ви логика е работела така, я оставям:
 
         // Прилагане на трансформации
         gltf.scene.position.x = item.position.x || 0;
@@ -29,11 +24,11 @@ export const loadLayout = async (layoutData, manager, maxHeight, scene, perspect
         gltf.scene.position.z = item.position.z || 0;
         gltf.scene.rotation.y = item.rotation.y || 0;
         if (item.scale) {
-        gltf.scene.scale.set(item.scale.x, item.scale.y, item.scale.z);
-      } else {
-        // Дефолт, ако няма данни (за да не стане мащаб 0)
-        gltf.scene.scale.set(1, 1, 1);
-      }
+          gltf.scene.scale.set(item.scale.x, item.scale.y, item.scale.z);
+        } else {
+          // Дефолт, ако няма данни (за да не стане мащаб 0)
+          gltf.scene.scale.set(1, 1, 1);
+        }
         gltf.scene.name = item.name || item.filename;
         gltf.scene.userData = { id: item.id, filename: item.filename };
 
@@ -51,7 +46,9 @@ export const loadLayout = async (layoutData, manager, maxHeight, scene, perspect
             node.receiveShadow = true;
           }
         });
-
+        if (item.texture) {
+          await handleTextureChange(gltf.scene, item.texture, item.tiling || { x: 1, y: 1 });
+        }
         scene.add(gltf.scene);
       } catch (err) {
         console.warn(`Error loading model ${item.filename}:`, err);
@@ -130,7 +127,7 @@ export const deleteRoom = async (projectId, roomId) => {
   return result.data;
 };
 
-export const updateRoom = async (projectId,  roomId, wallsData ) => {
+export const updateRoom = async (projectId, roomId, wallsData) => {
   const response = await fetch(`${API_URL}/api/projects/${projectId}/rooms`, {
     method: 'PUT',
     headers: {

@@ -3,7 +3,7 @@ import { ref } from 'vue';
 // --- Вътрешно състояние (Private state) ---
 let historyStack = [];
 let historyStep = -1;
-const MAX_HISTORY = 15; // Намалено до 15, за да е леко и бързо
+const MAX_HISTORY = 40; // Намалено до 15, за да е леко и бързо
 
 // Референции
 let _roomsDataRef = null;
