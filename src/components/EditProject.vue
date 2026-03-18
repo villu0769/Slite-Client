@@ -14,12 +14,13 @@
       <p @click="switchTo3D">3D</p>
     </div>
 
-    <SelectionToolbar :visible="isToolbarVisible" :position="toolbarPosition" :objType="toolbarObjType" @duplicate="handleDuplicate"
-      @rotate="handleToolbarRotate" @flip="handleFlip" @delete="handleDelete" />
+    <SelectionToolbar :visible="isToolbarVisible" :position="toolbarPosition" :objType="toolbarObjType"
+      @duplicate="handleDuplicate" @rotate="handleToolbarRotate" @flip="handleFlip" @delete="handleDelete" />
 
     <PropsMenu :visible="isPropsMenuVisible" :name="propsName" :details="propsDetails" :rotation="propsRotation"
-      :type="propsObjType" @update:texture="useTextureManager" @update:rotation="handlePropsMenuRotation"
-      @update:name="handlePropsMenuRename" />
+      :type="propsObjType" :texture="propsTexture" :ceiling="propsHasCeiling" @update:texture="useTextureManager"
+      @update:rotation="handlePropsMenuRotation" @update:name="handlePropsMenuRename" @update:color="useTextureManager"
+      @update:ceiling="handlePropsMenuCeiling" />
   </div>
 </template>
 
@@ -36,11 +37,11 @@ import { GammaCorrectionShader } from 'three/addons/shaders/GammaCorrectionShade
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { v4 as uuidv4 } from 'uuid';
 import debounce from 'lodash.debounce';
-import { handleTextureChange } from '../composables/textureManager.js';
+import { handleTextureChange, handleColorChange } from '../composables/textureManager.js';
 // Services & Components
 import { loadLayout, updateProjectLayout, addRoom, deleteRoom, updateRoom } from '../services/layoutService';
 import { loadRoomsGeometry } from '../services/roomService';
-import { createRoomGeometry, createWallGeometry, redrawWallGeometry } from '../services/roomService'; // Импортираме service-a
+import { createRoomGeometry, createWallGeometry, redrawWallGeometry, createCeilingGeometry } from '../services/roomService'; // Импортираме service-a
 import SelectionToolbar from '../components/SelectionToolbar.vue';
 import PropsMenu from '../components/PropsMenu.vue';
 import { useTheme } from '../composables/useTheme';
@@ -81,6 +82,8 @@ const propsName = ref('');
 const propsDetails = ref('');
 const propsRotation = ref(0);
 const propsObjType = ref('');
+const propsTexture = ref('');
+const propsHasCeiling = ref(false);
 
 // Saving State
 const saveLayoutDebounced = debounce(saveLayout, 900);
@@ -227,7 +230,13 @@ async function performRebuild() {
 async function useTextureManager(filename) {
   const selected = selectedObjects[0];
   try {
-    await handleTextureChange(selected, filename);
+    if (filename.startsWith('#')) {
+      handleColorChange(selected, filename);
+    }
+    else {
+      await handleTextureChange(selected, filename);
+    }
+    propsTexture.value = filename;
   }
   finally {
     if (isRoomObject(selected)) {
@@ -244,6 +253,7 @@ async function useTextureManager(filename) {
     }
   }
 }
+
 /* -------------------------
    CREATE ROOM LOGIC (NEW)
 ------------------------- */
@@ -434,6 +444,7 @@ const GRID_SNAP = { enabled: false, size: 0.1 };
 let isResizing = false;
 let activeResizeHandle = null; // 'left' or 'right'
 let initialResizeWidth = 0;
+let initialResizeDepth = 0;
 let initialResizePos = new THREE.Vector3();
 let initialClickPoint = new THREE.Vector3();
 let dragging = false;
@@ -473,63 +484,81 @@ function onPointerDownForDrag(e) {
   // =========================================================
   // PHASE 1: RESIZE HANDLES (ПРИОРИТЕТ 1)
   // =========================================================
-  // Търсим във всички обекти (recursive: true е важно за handles)
   const intersects = raycaster.intersectObjects(scene.children, true);
-
-  // Търсим дали сме цъкнали върху обект маркиран като handle
   const handleHit = intersects.find(hit => hit.object.userData.isResizeHandle);
 
   if (handleHit) {
     e.preventDefault();
     isResizing = true;
-    controls.enabled = false; 
+    controls.enabled = false;
 
     activeResizeHandle = handleHit.object.userData.side;
-    let wall = handleHit.object.userData.wall;
 
-    if (!wall && selectedObjects.length > 0) {
-      wall = selectedObjects[0];
+    // Взимаме обекта (може да е стена или под)
+    let targetObj = handleHit.object.userData.target || handleHit.object.userData.wall;
+
+    if (!targetObj && selectedObjects.length > 0) {
+      targetObj = selectedObjects[0];
     }
 
-    // ==========================================
-    // НОВО 1: Взимаме РЕАЛНАТА визуална ширина, 
-    // включвайки настоящия мащаб!
-    // ==========================================
-    const currentScaleX = wall.scale.x || 1;
-    const baseWidth = wall.userData.dimensions.width;
-    
-    initialResizeWidth = baseWidth * Math.abs(currentScaleX); // Истинската ширина в момента
-    initialResizePos = wall.position.clone();
-    wall.userData.initialResizeScaleX = currentScaleX;
+    const type = targetObj.userData.type;
+    initialResizePos = targetObj.position.clone();
 
-    const wallWorldPos = new THREE.Vector3();
-    wall.getWorldPosition(wallWorldPos);
-    dragPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), wallWorldPos);
+    // Намираме равнината за пресичане (хоризонтална)
+    const targetWorldPos = new THREE.Vector3();
+    targetObj.getWorldPosition(targetWorldPos);
+    dragPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 1, 0), targetWorldPos);
 
     const intersectionPoint = new THREE.Vector3();
     if (raycaster.ray.intersectPlane(dragPlane, intersectionPoint)) {
       initialClickPoint.copy(intersectionPoint);
     }
 
-    // ==========================================
-    // НОВО 2: Временно правим стената плътна без да викаме redrawWallGeometry!
-    // ==========================================
-    const solidGeo = new THREE.BoxGeometry(
-      baseWidth, 
-      wall.userData.dimensions.height, 
-      wall.userData.dimensions.depth
-    );
-    wall.geometry.dispose();
-    wall.geometry = solidGeo;
-    
-    // Скриваме всички прозорци/врати, закачени за тази стена
-    scene.traverse((child) => {
-      if ((child.userData.type === 'window' || child.userData.type === 'door') && child.userData.wallId === wall.userData.id) {
-        child.visible=false;
+    // --- ЛОГИКА АКО ОРАЗМЕРЯВАМЕ СТЕНА ---
+    if (type === 'wall') {
+      const currentScaleX = targetObj.scale.x || 1;
+      const baseWidth = targetObj.userData.dimensions.width;
+
+      initialResizeWidth = baseWidth * Math.abs(currentScaleX);
+      targetObj.userData.initialResizeScaleX = currentScaleX;
+
+      // Временно правим стената плътна
+      const solidGeo = new THREE.BoxGeometry(
+        baseWidth,
+        targetObj.userData.dimensions.height,
+        targetObj.userData.dimensions.depth
+      );
+      targetObj.geometry.dispose();
+      targetObj.geometry = solidGeo;
+
+      // Скриваме всички прозорци/врати
+      scene.traverse((child) => {
+        if ((child.userData.type === 'window' || child.userData.type === 'door') && child.userData.wallId === targetObj.userData.id) {
+          child.visible = false;
+        }
+      });
+    }
+    // --- ЛОГИКА АКО ОРАЗМЕРЯВАМЕ ПОД ---
+    else if (type === 'floor') {
+      const currentScaleX = targetObj.scale.x || 1;
+      const currentScaleZ = targetObj.scale.z || 1;
+
+      const baseWidth = targetObj.userData.dimensions.width;
+      const baseDepth = targetObj.userData.dimensions.depth;
+
+      // Ако дърпаме наляво/надясно, ни интересува ширината. Ако е горе/долу - дълбочината.
+      if (activeResizeHandle === 'left' || activeResizeHandle === 'right') {
+        initialResizeWidth = baseWidth * Math.abs(currentScaleX);
+      } else {
+        initialResizeDepth = baseDepth * Math.abs(currentScaleZ);
       }
-    });
-    
-    return;
+
+      // Запазваме и двата мащаба, за да ги ползваме в onPointerMove
+      targetObj.userData.initialResizeScaleX = currentScaleX;
+      targetObj.userData.initialResizeScaleZ = currentScaleZ;
+    }
+
+    return; // Излизаме, за да не се задейства Phase 2!
   }
 
   // =========================================================
@@ -639,47 +668,70 @@ function onPointerMoveForDrag(e) {
   // PHASE 1: RESIZE LOGIC (Ако flag-ът е вдигнат от pointerDown)
   // =========================================================
   if (isResizing && selectedObjects[0]) {
-    const wall = selectedObjects[0];
+    const targetObj = selectedObjects[0]; // Вече не е само стена
     const intersectionPoint = new THREE.Vector3();
 
     if (!raycaster.ray.intersectPlane(dragPlane, intersectionPoint)) return;
 
     const mouseVector = new THREE.Vector3().subVectors(intersectionPoint, initialClickPoint);
 
-    const wallDirection = new THREE.Vector3(1, 0, 0);
-    wallDirection.applyQuaternion(wall.quaternion).normalize();
+    // Проверяваме по коя ос оразмеряваме спрямо хванатия хендъл
+    const isXAxis = (activeResizeHandle === 'left' || activeResizeHandle === 'right');
 
-    const scaleSign = Math.sign(wall.userData.initialResizeScaleX || 1);
+    // Определяме локалната посока: X(1,0,0) за ляво/дясно, Z(0,0,1) за горе/долу
+    const direction = isXAxis ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
+    direction.applyQuaternion(targetObj.quaternion).normalize();
+
+    // Взимаме правилния начален мащаб и размер спрямо оста
+    const initialScale = isXAxis
+      ? (targetObj.userData.initialResizeScaleX || 1)
+      : (targetObj.userData.initialResizeScaleZ || 1);
+
+    const scaleSign = Math.sign(initialScale);
 
     if (scaleSign < 0) {
-      wallDirection.negate();
+      direction.negate();
     }
 
-    let delta = mouseVector.dot(wallDirection);
-    if (activeResizeHandle === 'left') delta = -delta;
+    // Проектираме движението на мишката върху нашата ос
+    let delta = mouseVector.dot(direction);
 
-    let newVisualWidth = initialResizeWidth + delta;
-    if (newVisualWidth < 0.2) newVisualWidth = 0.2; // Минимум ширина
+    // Ако дърпаме "отрицателните" хендъли (ляво по -X, горе по -Z), обръщаме делтата
+    if (activeResizeHandle === 'left' || activeResizeHandle === 'top') {
+      delta = -delta;
+    }
 
-    // 1. Прилагаме новия мащаб спрямо БАЗОВАТА ширина
-    const baseWidth = wall.userData.dimensions.width;
-    const scaleFactor = newVisualWidth / baseWidth;
-    wall.scale.x = scaleFactor * scaleSign;
+    // Взимаме началния размер и пресмятаме новия
+    const initialSize = isXAxis ? initialResizeWidth : initialResizeDepth;
+    let newVisualSize = initialSize + delta;
+    if (newVisualSize < 0.2) newVisualSize = 0.2; // Минимум размер
+
+    // 1. Прилагаме новия мащаб спрямо БАЗОВИЯ размер
+    const baseDimension = isXAxis ? targetObj.userData.dimensions.width : targetObj.userData.dimensions.depth;
+    const scaleFactor = newVisualSize / baseDimension;
+
+    if (isXAxis) {
+      targetObj.scale.x = scaleFactor * scaleSign;
+    } else {
+      targetObj.scale.z = scaleFactor * scaleSign;
+    }
 
     // 2. Местим центъра, за да остане отсрещната страна закована!
-    const widthDiff = newVisualWidth - initialResizeWidth;
-    const shiftAmount = widthDiff / 2;
-    const shiftVector = wallDirection.clone().multiplyScalar(shiftAmount);
+    const sizeDiff = newVisualSize - initialSize;
+    const shiftAmount = sizeDiff / 2;
+    const shiftVector = direction.clone().multiplyScalar(shiftAmount);
 
-    if (activeResizeHandle === 'left') shiftVector.negate();
+    if (activeResizeHandle === 'left' || activeResizeHandle === 'top') {
+      shiftVector.negate();
+    }
 
     const newPos = initialResizePos.clone().add(shiftVector);
-    wall.position.copy(newPos);
-    
-    // ВАЖНО: Форсираме ъпдейт, за да е сигурно, че позицията се прилага веднага
-    wall.updateMatrixWorld(true);
+    targetObj.position.copy(newPos);
 
-    updateHandlePositions(wall);
+    // ВАЖНО: Форсираме ъпдейт, за да е сигурно, че позицията се прилага веднага
+    targetObj.updateMatrixWorld(true);
+
+    updateHandlePositions(targetObj);
 
     return;
   }
@@ -746,14 +798,14 @@ function onPointerMoveForDrag(e) {
 
       scene.traverse(child => {
         if (hasCollision || child === dragObject) return;
-        
+
         // Проверяваме за удар само с други врати/прозорци на СЪЩАТА стена
-        if (child.userData && 
-           (child.userData.type === 'window' || child.userData.type === 'door') &&
-           child.userData.wallId === snap.wall.userData.id) {
-           
-           const siblingBox = new THREE.Box3().setFromObject(child).expandByScalar(0.0025);
-           if (dragBox.intersectsBox(siblingBox)) hasCollision = true;
+        if (child.userData &&
+          (child.userData.type === 'window' || child.userData.type === 'door') &&
+          child.userData.wallId === snap.wall.userData.id) {
+
+          const siblingBox = new THREE.Box3().setFromObject(child).expandByScalar(0.0025);
+          if (dragBox.intersectsBox(siblingBox)) hasCollision = true;
         }
       });
 
@@ -784,7 +836,7 @@ function onPointerMoveForDrag(e) {
 
   // 6. Прилагане (Local conversion)
   if (dragObject.parent) {
-    dragObject.parent.worldToLocal(targetWorld); 
+    dragObject.parent.worldToLocal(targetWorld);
   }
   dragObject.position.copy(targetWorld);
 
@@ -808,7 +860,7 @@ function onPointerMoveForDrag(e) {
   }
 
   e.preventDefault();
-}function getFloorLevelAt(x, z, object) {
+} function getFloorLevelAt(x, z, object) {
   // 1. Пускаме лъч отвисоко надолу на координати X, Z
   const raycasterDown = new THREE.Raycaster();
   raycasterDown.set(new THREE.Vector3(x, 50, z), new THREE.Vector3(0, -1, 0));
@@ -842,75 +894,113 @@ async function onPointerUpForDrag(e) {
   // PHASE 1: FINALIZE RESIZE
   // =========================================================
   if (isResizing && selectedObjects[0]) {
-    const wall = selectedObjects[0];
+    const targetObj = selectedObjects[0];
+    const type = targetObj.userData.type; // Разбираме дали е 'wall' или 'floor'
+
     controls.enabled = true;
     isResizing = false;
 
-    // 1. Изчисляваме новата реална ширина
-    const currentScale = wall.scale.x;
-    const originalWidth = wall.userData.dimensions.width;
-    const finalWidth = originalWidth * Math.abs(currentScale);
+    // ==========================================
+    // ЛОГИКА ЗА СТЕНА (Запазена 1:1 с твоята)
+    // ==========================================
+    if (type === 'wall') {
+      const currentScale = targetObj.scale.x;
+      const originalWidth = targetObj.userData.dimensions.width;
+      const finalWidth = originalWidth * Math.abs(currentScale);
 
-    // 2. Записваме новите размери в userData
-    wall.userData.dimensions.width = finalWidth;
+      targetObj.userData.dimensions.width = finalWidth;
+      targetObj.scale.x = Math.sign(currentScale) || 1;
+      targetObj.updateMatrixWorld(true);
 
-    // 3. МНОГО ВАЖНО: След като "изпекохме" новата ширина в userData и геометрията,
-    // трябва да ресетнем scale-а обратно на 1 (или -1, ако стената е флипната)!
-    wall.scale.x = Math.sign(currentScale) || 1;
-    wall.updateMatrixWorld(true);
+      const newGeo = new THREE.BoxGeometry(
+        finalWidth,
+        targetObj.userData.dimensions.height,
+        targetObj.userData.dimensions.depth
+      );
+      targetObj.geometry.dispose();
+      targetObj.geometry = newGeo;
 
-    // 4. Временно слагаме плътната геометрия с новия размер, за да няма мигане (flicker)
-    const newGeo = new THREE.BoxGeometry(
-      finalWidth,
-      wall.userData.dimensions.height,
-      wall.userData.dimensions.depth
-    );
-    wall.geometry.dispose();
-    wall.geometry = newGeo;
+      scene.traverse((child) => {
+        if ((child.userData.type === 'window' || child.userData.type === 'door') && child.userData.wallId === targetObj.userData.id) {
+          child.visible = true;
+        }
+      });
+
+      setTimeout(() => {
+        redrawWallGeometry(roomsData, scene, targetObj.userData.id, targetObj.userData.roomId);
+        createResizeHandles(targetObj, scene);
+      }, 10);
+    }
 
     // ==========================================
-    // ВРЪЩАМЕ ДУПКИТЕ И ПРОЗОРЦИТЕ
+    // ЛОГИКА ЗА ПОД (НОВО: Обработваме X и Z)
     // ==========================================
-    
-    // 5. Възстановяваме прозрачността на прозорците и вратите
-    scene.traverse((child) => {
-      if ((child.userData.type === 'window' || child.userData.type === 'door') && child.userData.wallId === wall.userData.id) {
-        child.visible=true;
+    else if (type === 'floor') {
+      const currentScaleX = targetObj.scale.x;
+      const currentScaleZ = targetObj.scale.z;
+
+      const originalWidth = targetObj.userData.dimensions.width;
+      // Взимаме старата дълбочина (в зависимост как си я кръстил в dimensions)
+      const originalDepth = targetObj.userData.dimensions.depth || targetObj.userData.dimensions.height;
+
+      const finalWidth = originalWidth * Math.abs(currentScaleX);
+      const finalDepth = originalDepth * Math.abs(currentScaleZ);
+
+      // 1. Записваме новите размери в userData
+      targetObj.userData.dimensions.width = finalWidth;
+      if (targetObj.userData.dimensions.depth !== undefined) {
+        targetObj.userData.dimensions.depth = finalDepth;
+      } else {
+        targetObj.userData.dimensions.height = finalDepth;
       }
-    });
 
-    // 6. Прерисуваме стената с изрязаните дупки
-    setTimeout(() => {
-      redrawWallGeometry(roomsData, scene, wall.userData.id, wall.userData.roomId);
-      
-      // ВАЖНО: Създаваме хендълите ТУК вътре, СЛЕД като геометрията е прерисувана,
-      // за да залепнат перфектно за новите ъгли на стената.
-      createResizeHandles(wall, scene);
-    }, 10);
+      // 2. Ресетваме scale-а обратно на 1
+      targetObj.scale.x = Math.sign(currentScaleX) || 1;
+      targetObj.scale.z = Math.sign(currentScaleZ) || 1;
+      targetObj.updateMatrixWorld(true);
 
-    // Save
-    updateRoomEntryFromObject(wall);
-    const roomId = wall.userData.roomId;
+      // 3. Слагаме новата плътна геометрия, за да изпечем мащаба
+      // Ползваме дебелината на стария под (обикновено Y оста на геометрията)
+      const thickness = targetObj.geometry.parameters.height || 0.1;
+      const newGeo = new THREE.BoxGeometry(finalWidth, thickness, finalDepth);
+      targetObj.geometry.dispose();
+      targetObj.geometry = newGeo;
+
+      // 4. Прерисуваме хендълите, за да залепнат за новия размер
+      setTimeout(() => {
+        createResizeHandles(targetObj, scene);
+      }, 10);
+    }
+
+    // ==========================================
+    // ЗАПАЗВАНЕ В БАЗАТА (ОБЩО)
+    // ==========================================
+
+    // Ъпдейтваме данните от обекта
+    updateRoomEntryFromObject(targetObj);
+
+    const roomId = targetObj.userData.roomId;
     const room = roomsData.value.find(r => r._id === roomId || r.id === roomId);
+
     if (room) {
+      // ВАЖНО: Тук подаваш room.wallsData. 
       await updateRoom(projectId, roomId, room.wallsData);
     }
+
     saveState();
-    
+
     return;
   }
+
   // =========================================================
-  // PHASE 2: EXISTING DRAG END LOGIC (FIXED)
-  // =========================================================
- // =========================================================
   // PHASE 2: EXISTING DRAG END LOGIC (FIXED)
   // =========================================================
   if (dragging) {
     // --- 1. СПИРАМЕ ВЛАЧЕНЕТО ВЕДНАГА! ---
-    dragging = false; 
+    dragging = false;
     const droppedObject = dragObject; // Запазваме референция към обекта
     dragObject = null; // Зануляваме глобалната променлива веднага
-    
+
     try { renderer.domElement.releasePointerCapture(e.pointerId); } catch (_) { }
     controls.enabled = true;
 
@@ -927,7 +1017,7 @@ async function onPointerUpForDrag(e) {
 
     // 3. Запазваме в базата
     if (isRoomObject(droppedObject)) {
-      
+
       if (droppedObject.userData.type === 'window' || droppedObject.userData.type === 'door') {
         const currentWallId = droppedObject.userData.wallId;
 
@@ -941,7 +1031,7 @@ async function onPointerUpForDrag(e) {
       }
 
       const currentRoomId = droppedObject.userData.roomId;
-      
+
       try {
         // А) Запазваме старата стая, ако обектът е преместен в друга
         if (originalRoomId !== null && originalRoomId !== currentRoomId) {
@@ -995,6 +1085,94 @@ async function handlePropsMenuRename(newName) {
   }
   saveState(); // Запазваме в историята след преименуване
 }
+async function handlePropsMenuCeiling(wantsCeiling) {
+  const floor = selectedObjects.find(o => o.userData.type === 'floor');
+  if (!floor || floor.userData.type !== 'floor') return;
+
+  const roomId = floor.userData.roomId;
+  const room = roomsData.value.find(r => r._id === roomId || r.id === roomId);
+  if (!room) return;
+
+  // 1. Търсим тавана в 3D сцената по ТИП и ROOM ID (без да ползваме имена)
+  let ceilingMesh = null;
+  scene.traverse((child) => {
+    if (child.userData.type === 'ceiling' && child.userData.roomId === roomId) {
+      ceilingMesh = child;
+    }
+  });
+
+  isLoading.value = true;
+
+  try {
+    if (wantsCeiling) {
+      // СЪЗДАВАНЕ НА ТАВАН
+      if (!ceilingMesh) {
+        const width = floor.userData.dimensions.width * Math.abs(floor.scale.x || 1);
+        const depth = (floor.userData.dimensions.depth || floor.userData.dimensions.height) * Math.abs(floor.scale.z || 1);
+
+        let maxWallY = 2.8; 
+        scene.traverse((child) => {
+          if (child.userData.type === 'wall' && child.userData.roomId === roomId) {
+            const box = new THREE.Box3().setFromObject(child);
+            if (box.max.y > maxWallY) {
+              maxWallY = box.max.y;
+            }
+          }
+        });
+
+        const yPos = maxWallY - 0.05;
+
+        // Генерираме тавана
+        const { ceilingMesh: newMesh, ceilingData } = createCeilingGeometry(roomId, width, depth, yPos, 0.1);
+
+        // Копираме точната X/Z позиция и ротация от пода
+        newMesh.position.x = floor.position.x;
+        newMesh.position.z = floor.position.z;
+        newMesh.rotation.copy(floor.rotation);
+
+        ceilingData.position = { x: newMesh.position.x, y: yPos, z: newMesh.position.z };
+        ceilingData.rotation = { x: newMesh.rotation.x, y: newMesh.rotation.y, z: newMesh.rotation.z };
+
+        // Добавяме в сцената и в локалния стейт
+        scene.add(newMesh);
+
+        room.hasCeiling = 1;
+        room.wallsData.push(ceilingData);
+      }
+    } else {
+      // ИЗТРИВАНЕ НА ТАВАНА
+      room.hasCeiling = -1;
+
+      // 1. Махаме от стейта всички обекти, които са тип 'ceiling'
+      room.wallsData = room.wallsData.filter(item => item.type !== 'ceiling');
+
+      if (ceilingMesh) {
+        scene.remove(ceilingMesh);
+        if (ceilingMesh.geometry) ceilingMesh.geometry.dispose();
+        
+        // Почистваме и материалите за избягване на memory leaks
+        if (ceilingMesh.material) {
+          if (Array.isArray(ceilingMesh.material)) {
+            ceilingMesh.material.forEach(m => m.dispose());
+          } else {
+            ceilingMesh.material.dispose();
+          }
+        }
+      }
+    }
+    // Запазваме промените
+    await updateRoom(projectId, roomId, room.wallsData, room.hasCeiling);
+    saveState();
+
+  } catch (error) {
+    console.error("Failed to toggle ceiling:", error);
+    alert("Could not update ceiling in database.");
+  } finally {
+    propsHasCeiling.value = wantsCeiling; 
+    isLoading.value = false;
+  }
+}
+
 /* -------------------------
    Drag from Menu (Async)
 ------------------------- */
@@ -1030,77 +1208,180 @@ function cancelMenuDragIfAny() {
   window.removeEventListener('pointerup', onMenuDragEnd);
 }
 
-function getSafePosition(proposedWorldPos, objectToMove) {
-  // ПРОМЯНА ТУК: Филтрираме стените, като махаме текущия обект (ако и той е стена)
-  const walls = scene.children.filter(o =>
-    (o.userData.type === 'wall' && o !== objectToMove && ((objectToMove.userData.type === 'floor' && o.userData.roomId !== objectToMove.userData.roomId) || objectToMove.userData.type !== 'floor')));
+function getRotatedCorners(object, targetPosition) {
+  let box;
 
-  let safePos = proposedWorldPos.clone();
+  // Проверяваме дали е прост обект (Mesh) или сложен GLTF (Group)
+  if (object.geometry) {
+    if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
+    box = object.geometry.boundingBox;
+  } else {
+    // Ако е GLTF, изчисляваме локалната му рамка спрямо всичките му деца
+    // Кешираме я в userData, за да не "убием" процесора при влачене
+    if (!object.userData.localBox) {
+      // 1. Запазваме текущите ротации и позиции
+      const oldPos = object.position.clone();
+      const oldQuat = object.quaternion.clone();
+      const oldScale = object.scale.clone();
 
-  // 1. Изчисляваме AABB на обекта, който местим
-  const objBox = new THREE.Box3().setFromObject(objectToMove);
+      // 2. Временно го връщаме в центъра без ротация, за да вземем чисти размери
+      object.position.set(0, 0, 0);
+      object.quaternion.identity();
+      object.scale.set(1, 1, 1);
+      object.updateMatrixWorld(true);
 
-  // Взимаме 4-те ъгъла (в световни координати)
-  const worldCorners = [
-    new THREE.Vector3(objBox.min.x, objBox.min.y, objBox.min.z),
-    new THREE.Vector3(objBox.min.x, objBox.min.y, objBox.max.z),
-    new THREE.Vector3(objBox.max.x, objBox.min.y, objBox.min.z),
-    new THREE.Vector3(objBox.max.x, objBox.min.y, objBox.max.z),
+      // 3. Изчисляваме общата кутия на целия GLTF модел
+      object.userData.localBox = new THREE.Box3().setFromObject(object);
+
+      // 4. Връщаме си го там, където е бил първоначално
+      object.position.copy(oldPos);
+      object.quaternion.copy(oldQuat);
+      object.scale.copy(oldScale);
+      object.updateMatrixWorld(true);
+    }
+    box = object.userData.localBox;
+  }
+
+  // Взимаме 4-те ъгъла (гледаме отгоре, X и Z)
+  const corners = [
+    new THREE.Vector3(box.min.x, 0, box.min.z),
+    new THREE.Vector3(box.max.x, 0, box.min.z),
+    new THREE.Vector3(box.max.x, 0, box.max.z),
+    new THREE.Vector3(box.min.x, 0, box.max.z)
   ];
 
-  for (const wall of walls) {
-    if (!wall.geometry.boundingBox) wall.geometry.computeBoundingBox();
-    const wallMin = wall.geometry.boundingBox.min;
-    const wallMax = wall.geometry.boundingBox.max;
+  // Симулираме къде ще бъде обектът (позиция + ротация + мащаб)
+  const matrix = new THREE.Matrix4().compose(
+    targetPosition,
+    object.quaternion,
+    object.scale
+  );
 
-    // Центърът на обекта в локалната система на стената
-    const localCenter = wall.worldToLocal(safePos.clone());
+  // Превръщаме ги в реални световни координати
+  return corners.map(c => c.applyMatrix4(matrix));
+}
 
-    // Изчисляваме колко е "голям" нашият обект спрямо тази стена
-    const currentWorldPos = objectToMove.position;
-    const offset = new THREE.Vector3().subVectors(safePos, currentWorldPos);
+const _normal = new THREE.Vector2(); // Създаваме го само веднъж глобално!
 
-    let minObjZ = Infinity, maxObjZ = -Infinity;
-    let minObjX = Infinity, maxObjX = -Infinity;
+function doPolygonsIntersect(polyA, polyB) {
+  const polygons = [polyA, polyB];
+  
+  for (let i = 0; i < polygons.length; i++) {
+    const polygon = polygons[i];
+    for (let i1 = 0; i1 < polygon.length; i1++) {
+      const i2 = (i1 + 1) % polygon.length;
+      const p1 = polygon[i1];
+      const p2 = polygon[i2];
 
-    worldCorners.forEach(corner => {
-      const predictedCornerWorld = corner.clone().add(offset);
-      const localCorner = wall.worldToLocal(predictedCornerWorld);
+      // Използваме преизползваем вектор, вместо да създаваме нов (пести памет)
+      _normal.set(p2.z - p1.z, p1.x - p2.x).normalize();
 
-      if (localCorner.z < minObjZ) minObjZ = localCorner.z;
-      if (localCorner.z > maxObjZ) maxObjZ = localCorner.z;
-      if (localCorner.x < minObjX) minObjX = localCorner.x;
-      if (localCorner.x > maxObjX) maxObjX = localCorner.x;
-    });
+      let minA = Infinity, maxA = -Infinity;
+      for (let j = 0; j < polyA.length; j++) {
+        const projected = _normal.x * polyA[j].x + _normal.y * polyA[j].z;
+        if (projected < minA) minA = projected;
+        if (projected > maxA) maxA = projected;
+      }
 
-    const objectHalfWidth = (maxObjX - minObjX) / 2;
-    const objectHalfDepth = (maxObjZ - minObjZ) / 2;
+      let minB = Infinity, maxB = -Infinity;
+      for (let j = 0; j < polyB.length; j++) {
+        const projected = _normal.x * polyB[j].x + _normal.y * polyB[j].z;
+        if (projected < minB) minB = projected;
+        if (projected > maxB) maxB = projected;
+      }
 
-    // Параметри на стената
-    const wallHalfLength = (wallMax.x - wallMin.x) / 2;
-    const wallHalfThickness = (wallMax.z - wallMin.z) / 2;
+      if (maxA <= minB || maxB <= minA) {
+        return false; 
+      }
+    }
+  }
+  return true;
+}
 
-    // ПРОВЕРКИ
-    const xLimit = wallHalfLength + objectHalfWidth;
-    const zLimit = wallHalfThickness + objectHalfDepth;
+function getSafePosition(proposedWorldPos, objectToMove) {
+  const allWalls = scene.children.filter(o =>
+    (o.userData.type === 'wall' && o !== objectToMove && 
+    ((objectToMove.userData.type === 'floor' && o.userData.roomId !== objectToMove.userData.roomId) || objectToMove.userData.type !== 'floor'))
+  );
 
-    // Ако сме в рамките на дължината и дълбочината на стената
-    if (Math.abs(localCenter.x) <= xLimit && Math.abs(localCenter.z) < zLimit) {
+  const currentPos = objectToMove.position.clone();
 
-      const sign = Math.sign(localCenter.z) || 1;
+  // Бърз филтър (Broadphase) - взимаме само близките стени
+  const MAX_DISTANCE = 15; 
+  const nearbyWalls = allWalls.filter(wall => 
+    wall.position.distanceTo(proposedWorldPos) < MAX_DISTANCE || 
+    wall.position.distanceTo(currentPos) < MAX_DISTANCE
+  );
 
-      // Избутваме!
-      localCenter.z = sign * zLimit;
+  if (nearbyWalls.length === 0) return proposedWorldPos;
 
-      const worldFixed = wall.localToWorld(localCenter);
-      safePos.x = worldFixed.x;
-      safePos.z = worldFixed.z;
+  const movement = new THREE.Vector3().subVectors(proposedWorldPos, currentPos);
+  const distance = movement.length();
+  
+  if (distance < 0.001) return proposedWorldPos;
+
+  const stepSize = 0.1; 
+  const steps = Math.max(1, Math.ceil(distance / stepSize));
+  
+  let safePos = currentPos.clone();
+
+  // Кешираме ъглите на близките стени
+  const cachedWalls = nearbyWalls.map(wall => ({
+    corners: getRotatedCorners(wall, wall.position)
+  }));
+
+  // Стъпково движение
+  for (let i = 1; i <= steps; i++) {
+    // 1. Опитваме да направим пълната стъпка по диагонала
+    const stepFraction = i / steps;
+    const testPos = currentPos.clone().add(movement.clone().multiplyScalar(stepFraction));
+    
+    if (!checkCollisionAt(testPos, objectToMove, cachedWalls)) {
+      // Стъпката е успешна, няма удар
+      safePos.copy(testPos);
+    } else {
+      // --- ТАЙНАТА НА ПЛЪЗГАНЕТО (SLIDING) ---
+      // Ударихме стена! Вместо да спираме (break), опитваме да се плъзнем.
+      
+      let moved = false;
+      const stepX = movement.x / steps;
+      const stepZ = movement.z / steps;
+
+      // Опитваме да се преместим САМО по оста X
+      const testPosX = safePos.clone();
+      testPosX.x += stepX;
+      if (!checkCollisionAt(testPosX, objectToMove, cachedWalls)) {
+        safePos.copy(testPosX);
+        moved = true;
+      }
+      
+      // Опитваме да се преместим САМО по оста Z
+      const testPosZ = safePos.clone();
+      testPosZ.z += stepZ;
+      if (!checkCollisionAt(testPosZ, objectToMove, cachedWalls)) {
+        safePos.z = testPosZ.z; // Запазваме си X-а от предната проверка и добавяме Z
+        moved = true;
+      }
+
+      // Ако не можем да мръднем нито по X, нито по Z, значи сме натикани плътно в ъгъл (между 2 стени)
+      if (!moved) {
+        break; 
+      }
     }
   }
 
   return safePos;
 }
 
+function checkCollisionAt(pos, objectToMove, cachedWalls) {
+  const testCorners = getRotatedCorners(objectToMove, pos);
+  for (const wall of cachedWalls) {
+    if (doPolygonsIntersect(testCorners, wall.corners)) {
+      return true; // Има сблъсък
+    }
+  }
+  return false; // Чисто е
+}
 
 function makePreviewMaterials(node) {
   if (!node.isMesh || !node.material) return;
@@ -1250,7 +1531,7 @@ function finalizeDropAt(posWorld) {
 
 // Check if an object belongs to a room (has a roomId)
 function isRoomObject(obj) {
-  return obj.userData.type == 'wall' || obj.userData.type === 'floor' || obj.userData.type === 'door' || obj.userData.type === 'window';
+  return obj.userData.type == 'wall' || obj.userData.type === 'floor' || obj.userData.type === 'door' || obj.userData.type === 'window' || obj.userData.type === 'ceiling';
 }
 
 // Sync 3D Mesh position/rotation to the Vue Ref (roomsData)
@@ -1258,17 +1539,17 @@ function updateRoomEntryFromObject(obj) {
   if (!isRoomObject(obj)) return;
 
   const currentRoomId = obj.userData.roomId; // В коя стая го пускаме
-  const itemId = obj.userData.id; 
+  const itemId = obj.userData.id;
 
   // 1. Използваме originalRoomId (ако сме влачили). Ако просто обновяваме обект (без влачене), ползваме currentRoomId.
-  const searchRoomId = originalRoomId!==null ? originalRoomId : currentRoomId;
+  const searchRoomId = originalRoomId !== null ? originalRoomId : currentRoomId;
 
   // 2. Намираме индекса на старата стая
   const oldRoomIndex = roomsData.value.findIndex(r => r._id === searchRoomId || r.id === searchRoomId);
   if (oldRoomIndex === -1) return;
 
   // 3. Намираме индекса на обекта в старата стая
-  const itemIndexInOldRoom = roomsData.value[oldRoomIndex].wallsData.findIndex(w => w.id === itemId);
+  const itemIndexInOldRoom = roomsData.value[oldRoomIndex].wallsData.findIndex(w => w.id === itemId || w._id === itemId);
   if (itemIndexInOldRoom === -1) return;
 
   // Взимаме референцията към данните
@@ -1294,10 +1575,10 @@ function updateRoomEntryFromObject(obj) {
   // =========================================================
   dataEntry.position = { x: obj.position.x, y: obj.position.y, z: obj.position.z };
   dataEntry.rotation = { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z };
-  
+
   if (obj.name) dataEntry.name = obj.name;
   if (obj.userData.texture) dataEntry.texture = obj.userData.texture;
-  
+
   if (obj.userData.type === 'window' || obj.userData.type === 'door') {
     dataEntry.wallId = obj.userData.wallId;
     dataEntry.roomId = obj.userData.roomId;
@@ -1360,7 +1641,7 @@ function updateSelectionUI(obj) {
   toolbarPosition.y = -(vector.y * halfHeight) + halfHeight + 0.1;
   isToolbarVisible.value = true;
 
-  if (obj.userData.type === 'wall') {
+  if (obj.userData.type === 'wall' || obj.userData.type === 'floor') {
     createResizeHandles(obj, scene);
   } else {
     removeResizeHandles();
@@ -1371,6 +1652,13 @@ function updateSelectionUI(obj) {
   isPropsMenuVisible.value = true;
   propsName.value = obj.name || 'Unknown Object';
   propsObjType.value = obj.userData.type || 'unknown';
+  propsTexture.value = obj.userData.texture;
+  if (obj.userData.type === 'floor') {
+    const room = roomsData.value.find(r => r._id === obj.userData.roomId || r.id === obj.userData.roomId);
+    propsHasCeiling.value = room ? room.hasCeiling==1 : false;
+  } else {
+    propsHasCeiling.value = false;
+  }
   propsDetails.value = `w:${size.x.toFixed(2)} h:${size.y.toFixed(2)} d:${size.z.toFixed(2)}`;
   const degrees = Math.round((obj.rotation.y * 180 / Math.PI));
   propsRotation.value = degrees;
@@ -1382,7 +1670,8 @@ function clearSelection() {
   removeResizeHandles();
   isToolbarVisible.value = false;
   isPropsMenuVisible.value = false;
-}async function handlePropsMenuRotation(newDegrees) {
+}
+async function handlePropsMenuRotation(newDegrees) {
   const obj = selectedObjects[0];
   if (!obj) return;
 
@@ -1402,13 +1691,13 @@ function clearSelection() {
       } else {
         // --- МАГИЯТА ЗА ПРОЗОРЦИ/ВРАТИ ---
         // Използваме векторна ротация около центъра на стената
-        let relPos = o.position.clone().sub(center); 
+        let relPos = o.position.clone().sub(center);
         // Въртим вектора на отместването около оста Y
         relPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), deltaRad);
-        
+
         // Слагаме новата позиция
         o.position.copy(center).add(relPos);
-        
+
         // Въртим и самия меш (тук използваме delta, за да добавим към текущата)
         o.rotation.y += deltaRad;
       }
@@ -1437,7 +1726,7 @@ function clearSelection() {
     // Единичен обект
     obj.rotation.y = newRotationRad;
     obj.updateMatrixWorld(true);
-    
+
     if (isRoomObject(obj)) {
       updateRoomEntryFromObject(obj);
       const roomId = obj.userData.roomId;
@@ -1535,7 +1824,7 @@ async function handleToolbarRotate(angleDeg) {
     // Standard Single Object Rotation
     const obj = selectedObjects[0];
     obj.rotation.y += angleRad;
-    
+
     // ---> НОВО: Обновяваме матрицата веднага
     obj.updateMatrixWorld(true);
 
@@ -1546,7 +1835,7 @@ async function handleToolbarRotate(angleDeg) {
       if (room) {
         await updateRoom(projectId, roomId, room.wallsData);
       }
-      
+
       // ---> НОВО: Прерисуваме дупката с малко закъснение, ако сме завъртели прозорец/стена директно
       setTimeout(() => {
         if (obj.userData.type === 'wall') {
@@ -1613,8 +1902,8 @@ async function handleFlip(axis) {
   updateSelectionUI(selectedObjects[0]);
 }
 
-async function handleDelete() {
-  const obj = selectedObjects[0];
+async function handleDelete(ceilingOnly = false) {
+  const obj = ceilingOnly ? selectedObjects.find(o => o.userData.type === 'ceiling') : selectedObjects[0];
   if (!obj) return;
 
   const roomId = obj.userData.roomId; // Check if it belongs to a room
@@ -1623,7 +1912,6 @@ async function handleDelete() {
   // SCENARIO 1: IT IS A ROOM OBJECT (Wall or Floor)
   // isRoomObject
   if (isRoomObject(obj)) {
-
     // --- A: IT IS THE FLOOR (Delete Entire Room) ---
     if (obj.userData.type === 'floor') {
       if (!confirm("Deleting the floor will remove the entire room. Continue?")) return;
@@ -1657,19 +1945,22 @@ async function handleDelete() {
     }
 
     // --- B: IT IS A WALL (Update Room to remove just this wall) ---
-    else if (obj.userData.type === 'wall' || obj.userData.type === 'door' || obj.userData.type === 'window') {
+    else if (obj.userData.type === 'wall' || obj.userData.type === 'ceiling' || obj.userData.type === 'door' || obj.userData.type === 'window') {
       try {
+
         // 1. Find the current room in our state
         const roomIndex = roomsData.value.findIndex(r => r._id === roomId || r.id === roomId);
         if (roomIndex === -1) return;
 
         const currentRoom = roomsData.value[roomIndex];
-        const idsToRemove = selectedObjects.map(o => o.userData.id || o.userData._id);
+        const idsToRemove = ceilingOnly ? [obj.userData.id || obj.userData._id] : selectedObjects.map(o => o.userData.id || o.userData._id);
         const updatedWallsData = currentRoom.wallsData.filter(w => !idsToRemove.includes(w.id || w._id));
-        
+
+        if (obj.userData.type === 'ceiling') currentRoom.hasCeiling = -1;
+
         // 3. Call API: We are UPDATING the room, not deleting the room entity
         // Note: We use the immediate updateRoom, not the debounced one, for instant feedback
-        updateRoomDebounced(projectId, roomId, updatedWallsData);
+        updateRoomDebounced(projectId, roomId, updatedWallsData, currentRoom.hasCeiling);
 
         // 4. Update Local State
         roomsData.value[roomIndex].wallsData = updatedWallsData;
@@ -1682,10 +1973,16 @@ async function handleDelete() {
         }
         saveState();
         // 5. Scene Cleanup: Remove ONLY the selected wall mesh
-        selectedObjects.forEach(mesh => {
-          scene.remove(mesh);
-          disposeObject(mesh);
-        });
+        if (!ceilingOnly) {
+          selectedObjects.forEach(mesh => {
+            scene.remove(mesh);
+            disposeObject(mesh);
+          });
+        }
+        else {
+          scene.remove(obj);
+          disposeObject(obj);
+        }
 
       } catch (err) {
         console.error("Error deleting wall:", err);
@@ -1962,6 +2259,10 @@ async function addWindowToWallCenter(WindowData) {
       } catch (e) {
         console.error("Error saving window:", e);
       }
+      selectedObjects.length = 0;
+      selectedObjects.push(WindowGroup); // Селектираме групата!
+      activeOutlinePass.selectedObjects = selectedObjects;
+      updateSelectionUI(WindowGroup);
     }
   }
   catch (err) {
@@ -1999,27 +2300,38 @@ function bindControllerToCamera(cam) {
   controls.dampingFactor = 0.08;
   controls.update();
 }
-
 function switchTo2D() {
   dir.intensity = 0;
   activeCamera = orthoCamera;
   activeOutlinePass = outlinePass2D;
   bindControllerToCamera(activeCamera);
+  
   controls.enableRotate = false;
+  controls.enablePan = true;     
+  
+  controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
+
   controls.reset();
+  
   activeCamera.position.set(0, 20, 0);
-  activeCamera.lookAt(0, 0, 0);
+  controls.target.set(0, 0, 0);
+  controls.update(); 
+
   renderPass.camera = activeCamera;
   composer.removePass(outlinePass3D);
   composer.addPass(outlinePass2D);
 }
-
 function switchTo3D() {
   dir.intensity = 1;
   activeCamera = perspectiveCamera;
   activeOutlinePass = outlinePass3D;
   bindControllerToCamera(activeCamera);
+  
   controls.enableRotate = true;
+  
+  controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE; 
+  controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;   
+  
   renderPass.camera = activeCamera;
   composer.removePass(outlinePass2D);
   composer.addPass(outlinePass3D);

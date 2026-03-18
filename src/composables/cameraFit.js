@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-const FIT_MARGIN = 1.5;
+const FIT_MARGIN = 1;
 
 export const computeSceneBoundingBox = (root)=> {
   const box = new THREE.Box3();

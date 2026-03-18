@@ -1,5 +1,5 @@
 import { getGLTFLoader } from '../services/gltfLoader'
-import { handleTextureChange } from '../composables/textureManager' 
+import { handleTextureChange,handleColorChange } from '../composables/textureManager'
 
 import * as THREE from 'three';
 const API_URL = "https://slite-api.onrender.com";
@@ -47,7 +47,12 @@ export const loadLayout = async (layoutData, manager, maxHeight, scene, perspect
           }
         });
         if (item.texture) {
-          await handleTextureChange(gltf.scene, item.texture, item.tiling || { x: 1, y: 1 });
+          if (item.texture.startsWith('#')) {
+            handleColorChange(gltf.scene, item.texture);
+          }
+          else {
+            await handleTextureChange(gltf.scene, item.texture);
+          }
         }
         scene.add(gltf.scene);
       } catch (err) {
@@ -127,14 +132,14 @@ export const deleteRoom = async (projectId, roomId) => {
   return result.data;
 };
 
-export const updateRoom = async (projectId, roomId, wallsData) => {
+export const updateRoom = async (projectId, roomId, wallsData,hasCeiling=0) => {
   const response = await fetch(`${API_URL}/api/projects/${projectId}/rooms`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${localStorage.getItem('token')}`,
     },
-    body: JSON.stringify({ roomId, wallsData }),
+    body: JSON.stringify({ roomId, wallsData,hasCeiling})
   });
   const result = await response.json();
 

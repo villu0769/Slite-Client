@@ -31,13 +31,18 @@
 
     <p id="props-selected-coords">{{ details }}</p>
 
+    <v-switch v-if="type=='floor'"  label="Таван" v-model="hasCeiling"  >
+
+    </v-switch >
+
     <div id="props-rotate">
-      <button type="button" @click="rotate(-15)" title="Rotate -15°">⟲</button>
+      <button type="button" @click="rotate(-15)" title="Rotate` -15°">⟲</button>
       <button type="button" @click="rotate(15)" title="Rotate +15°">⟳</button>
 
       <input type="number" step="1" min="-360" max="360" :value="rotationValue" @change="onInputChange"
         @keydown.enter="onInputChange" title="Rotation (degrees)" />
     </div>
+
 
     <div v-if="showTextures" class="props-textures">
       <div class="divider"></div>
@@ -54,29 +59,65 @@
         </button>
       </div>
     </div>
+    <div class="props-textures">
+      <div class="divider"></div>
+      <p class="section-label">Color</p>
+      <div class="texture-grid">
+         <ColorPicker 
+          :initialColor="(props.texture && props.texture.startsWith('#') ? props.texture : '#000000')" 
+          @update:color="(newHex) => $emit('update:color', newHex)"
+        />
+        <button 
+          v-for="col in colors" 
+          :key="col.id" 
+          class="texture-btn" 
+          @click="$emit('update:color', col.color)"
+          :title="col.name"
+        >
+          <div class="texture-preview" :style="{ backgroundColor: col.color }"></div>
+        </button>
+      </div>
+    </div>
 
   </div>
 </template>
 
 <script setup>
 import { computed, ref, watch, nextTick } from 'vue';
-
+import ColorPicker from './ColorPicker.vue';
 const props = defineProps({
   visible: { type: Boolean, default: false },
   type: { type: String, default: '' },
   name: { type: String, default: '' },
   details: { type: String, default: '' },
-  rotation: { type: Number, default: 0 }
+  texture: { type: String, default: '' },
+  rotation: { type: Number, default: 0 },
+  ceiling: { type: Boolean, default: false }
 });
 
-const emit = defineEmits(['update:rotation', 'update:name', 'update:texture']);
+// Създаваме двупосочна връзка с пропса
+const hasCeiling = computed({
+  get: () => props.ceiling,
+  set: (value) => emit('update:ceiling', value)
+});
+
+const emit = defineEmits(['update:rotation', 'update:name', 'update:texture', 'update:color','update:ceiling']);
 
 /* ---------------- TEXTURE LOGIC (НОВО) ---------------- */
 
 // Примерни текстури - смени URL-ите с реалните си файлове
 const textures = [
-  { id: 'oak', name: 'Havos Oak', filename: 'egger-havos-oak.jpg', fallbackColor: '#8B5A2B' },
-  { id: 'walnut', name: 'Walnut', filename: 'egger-walnut.jpg', fallbackColor: '#95a5a6' },
+  { id: 'oak', name: 'Havos Oak', filename: 'egger-havos-oak.jpg', fallbackColor: '#8B5A2B'},
+  { id: 'walnut', name: 'Walnut', filename: 'egger-walnut.jpg', fallbackColor: '#95a5a6'},
+];
+const colors=[
+  { id: 'white', name: 'White', color: '#ffffff' },
+  { id: 'black', name: 'Black', color: '#000000' },
+  {id:'red',name:'Red',color:'#ff0000'},
+  {id:'green',name:'Green',color:'#00ff00' },
+  {id:'blue',name:'Blue',color:'#0000ff' },
+  {id:'yellow',name:'Yellow',color:'#ffff00' },
+  {id:'gray',name:'Gray',color:'#808080' },
 ];
 
 // Показваме панела само ако има тип и той НЕ е стена или под
@@ -84,13 +125,17 @@ const showTextures = computed(() => {
   return props.type && props.type !== 'wall' && props.type !== 'floor';
 });
 
+
 /* ---------------- ROTATION LOGIC ---------------- */
 const rotationValue = computed(() => Math.round(props.rotation));
 
 function rotate(delta) {
   emit('update:rotation', props.rotation + delta);
 }
-
+function onCustomColorChange(e) {
+  const hexColor = e.target.value; // Връща директно HEX (напр. #4a90e2)
+  emit('update:color', hexColor);
+}
 function onInputChange(e) {
   const val = parseFloat(e.target.value);
   if (!isNaN(val)) {
@@ -245,6 +290,7 @@ input[type=number] {
 
 .texture-grid {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-start;
 }
@@ -273,4 +319,13 @@ input[type=number] {
   background-size: cover;
   background-position: center;
 }
+.custom-color-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Готин многоцветен фон, който подсказва, че е палитра */
+  background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
+}
+
 </style>

@@ -356,6 +356,7 @@ function handleAddWindow() {
     heightFromFloor: windowConfig.heightFromFloor,           // Можем да добавим и тази конфигурация
     filename: selectedWindowModel.value.filename
   });
+  goBack();
 }
 
 function goBack() {
