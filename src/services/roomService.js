@@ -5,10 +5,19 @@ import { v4 as uuidv4 } from 'uuid';
 import { handleTextureChange, handleColorChange } from '../composables/textureManager'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
+const baseMaterialWall = new THREE.MeshStandardMaterial({
+    color: 0xffffff, roughness: 0.7,
+    metalness: 0.1,
+    side: THREE.DoubleSide
+  });
+
+  const baseMaterialFloor = new THREE.MeshStandardMaterial({
+    color: 0xba9eab, roughness: 0.7,
+    metalness: 0.2,
+  });
+
 export const createRoomGeometry = (width, length, height, WALL_THICKNESS) => {
   const WALL_HEIGHT = height;
-  const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xeeeeee });
-  const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x8d6e63 });
 
   const roomEntry = {
     id: uuidv4(),
@@ -20,16 +29,17 @@ export const createRoomGeometry = (width, length, height, WALL_THICKNESS) => {
   // --- 1. FLOOR ---
   // Подът си остава прост Box
   const floorGeo = new THREE.BoxGeometry(width, 0.1, length);
-  const floor = new THREE.Mesh(floorGeo, floorMaterial);
-  floor.position.set(0, 0.05, 0); // Леко надолу, за да е на y=0 нивото
-  floor.name = 'room_floor';
-  floor.userData = { type: 'floor', roomId: roomEntry.id,dimensions: { width, height: 0.1, depth: length }};
+  const floor = new THREE.Mesh(floorGeo, baseMaterialFloor);
+  floor.castShadow = true;
+  floor.receiveShadow = true;
+  floor.name = 'Под';
+  floor.userData = { type: 'floor', roomId: roomEntry.id, dimensions: { width, height: 0.1, depth: length } };
 
   objs.push(floor);
   roomEntry.wallsData.push({
     id: uuidv4(),
     type: 'floor',
-    name: 'room_floor',
+    name: 'Под',
     dimensions: { width, height: 0.1, depth: length },
     position: { x: 0, y: 0.05, z: 0 },
     rotation: { x: 0, y: 0, z: 0 }
@@ -45,20 +55,20 @@ export const createRoomGeometry = (width, length, height, WALL_THICKNESS) => {
       name: 'Стена - задна',
       // Геометрията винаги е: (Дължина на стената, Височина, Дебелина)
       size: { w: width, h: WALL_HEIGHT, d: WALL_THICKNESS },
-      pos: { x: 0, y: WALL_HEIGHT / 2 + 0.1, z: -length / 2+WALL_THICKNESS/2 },
+      pos: { x: 0, y: WALL_HEIGHT / 2 + 0.1, z: -length / 2 + WALL_THICKNESS / 2 },
       rot: { x: 0, y: 0, z: 0 } // 0 градуса
     },
     {
       name: 'Стена - лява',
       // Взимаме (length - дебелината), за да пасне между предната и задната
       size: { w: length - WALL_THICKNESS, h: WALL_HEIGHT, d: WALL_THICKNESS },
-      pos: { x: -(width - WALL_THICKNESS) / 2, y: WALL_HEIGHT / 2  + 0.1, z: WALL_THICKNESS/2 },
+      pos: { x: -(width - WALL_THICKNESS) / 2, y: WALL_HEIGHT / 2 + 0.1, z: WALL_THICKNESS / 2 },
       rot: { x: 0, y: Math.PI / 2, z: 0 } // -90 градуса (завърта се)
     },
     {
       name: 'Стена - дясна',
       size: { w: length - WALL_THICKNESS, h: WALL_HEIGHT, d: WALL_THICKNESS },
-      pos: { x: (width - WALL_THICKNESS) / 2, y: WALL_HEIGHT / 2  + 0.1, z:WALL_THICKNESS/2 },
+      pos: { x: (width - WALL_THICKNESS) / 2, y: WALL_HEIGHT / 2 + 0.1, z: WALL_THICKNESS / 2 },
       rot: { x: 0, y: -Math.PI / 2, z: 0 } // 90 градуса
     }
   ];
@@ -66,7 +76,10 @@ export const createRoomGeometry = (width, length, height, WALL_THICKNESS) => {
   wallsConfig.forEach(cfg => {
     // Създаваме геометрията винаги "легнала" по X
     const geometry = new THREE.BoxGeometry(cfg.size.w, cfg.size.h, cfg.size.d);
-    const wallMesh = new THREE.Mesh(geometry, wallMaterial.clone());
+    const wallMesh = new THREE.Mesh(geometry, baseMaterialWall.clone());
+
+    wallMesh.castShadow = true;
+    wallMesh.receiveShadow = true;
 
     // Позиционираме
     wallMesh.position.set(cfg.pos.x, cfg.pos.y, cfg.pos.z);
@@ -104,7 +117,6 @@ export const createRoomGeometry = (width, length, height, WALL_THICKNESS) => {
 
 export const createWallGeometry = (length, height, WALL_THICKNESS) => {
   const WALL_HEIGHT = height;
-  const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xeeeeee });
   const roomEntry = {
     id: uuidv4(),
     wallsData: []
@@ -126,11 +138,10 @@ export const createWallGeometry = (length, height, WALL_THICKNESS) => {
       rot: { x: 0, y: 0, z: 0 } // 0 градуса
     },
   ];
-
   wallsConfig.forEach(cfg => {
     // Създаваме геометрията винаги "легнала" по X
     const geometry = new THREE.BoxGeometry(cfg.size.w, cfg.size.h, cfg.size.d);
-    const wallMesh = new THREE.Mesh(geometry, wallMaterial.clone());
+    const wallMesh = new THREE.Mesh(geometry, baseMaterialWall.clone());
 
     // Позиционираме
     wallMesh.position.set(cfg.pos.x, cfg.pos.y, cfg.pos.z);
@@ -165,19 +176,20 @@ export const createWallGeometry = (length, height, WALL_THICKNESS) => {
   return { roomEntry, objs };
 };
 
-export const createCeilingGeometry = (roomId,width, depth, yPosition, thickness = 0.1) => {
+export const createCeilingGeometry = (roomId, width, depth, yPosition, thickness = 0.1) => {
   // Създаваме геометрия и материал
   const geometry = new THREE.BoxGeometry(width, thickness, depth);
-  const material = new THREE.MeshStandardMaterial({ color: 0xffffff }); // Бял таван по подразбиране
+  const material = baseMaterialWall.clone(); // Бял таван по подразбиране
   const ceilingMesh = new THREE.Mesh(geometry, material);
-
+  ceilingMesh.castShadow = true;
+  ceilingMesh.receiveShadow = true;
   // Задаваме само Y позицията (височината). 
   // X и Z ще ги вземем от пода малко по-късно, за да съвпаднат идеално.
-  ceilingMesh.position.set(0, yPosition, 0); 
+  ceilingMesh.position.set(0, yPosition, 0);
 
   const ceilingId = uuidv4();
   ceilingMesh.name = 'Таван';
-  
+
   // Данни за Three.js обекта
   ceilingMesh.userData = {
     id: ceilingId,
@@ -203,8 +215,8 @@ export const createCeilingGeometry = (roomId,width, depth, yPosition, thickness 
 // Инициализираме лоудъра веднъж
 const loader = new GLTFLoader();
 export const loadRoomsGeometry = async (roomsData, scene) => {
-  const baseMaterialWall = new THREE.MeshStandardMaterial({ color: 0xeeeeee });
-  const baseMaterialFloor = new THREE.MeshStandardMaterial({ color: 0xba9eab });
+  
+  
 
   if (!roomsData || !Array.isArray(roomsData)) return;
 
@@ -254,7 +266,7 @@ export const loadRoomsGeometry = async (roomsData, scene) => {
             doorGroup.add(sideA);
             doorGroup.add(sideB);
 
-             if (item.texture) {
+            if (item.texture) {
               if (item.texture.startsWith('#')) {
                 handleColorChange(sideA, item.texture);
                 handleColorChange(sideB, item.texture);
@@ -311,12 +323,12 @@ export const loadRoomsGeometry = async (roomsData, scene) => {
               windowModel.scale.set(item.scale.x, item.scale.y, item.scale.z);
             }
 
-             if (item.texture) {
+            if (item.texture) {
               if (item.texture.startsWith('#')) {
                 handleColorChange(windowModel, item.texture);
               }
               else {
-                await handleTextureChange( windowModel, item.texture);
+                await handleTextureChange(windowModel, item.texture);
               }
             }
 
@@ -337,7 +349,7 @@ export const loadRoomsGeometry = async (roomsData, scene) => {
               texture: item.texture ?? null
             };
 
-           
+
             scene.add(windowGroup);
 
           } catch (err) {
@@ -360,7 +372,7 @@ export const loadRoomsGeometry = async (roomsData, scene) => {
               item.dimensions.height,
               item.dimensions.depth
             );
-            material = item.type=='ceiling'?baseMaterialWall:baseMaterialFloor.clone();
+            material = item.type == 'ceiling' ? baseMaterialWall : baseMaterialFloor.clone();
           } else {
             // ЗА СТЕНИТЕ: Викаме новата функция, която ще изреже дупките!
             // Подаваме текущата стена и целия масив с обекти за стаята (за да намери прозорците)
@@ -369,9 +381,11 @@ export const loadRoomsGeometry = async (roomsData, scene) => {
           }
 
           const mesh = new THREE.Mesh(geometry, material);
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
           mesh.position.set(item.position.x, item.position.y, item.position.z);
           mesh.rotation.set(item.rotation.x, item.rotation.y, item.rotation.z);
-          mesh.name=item.name;
+          mesh.name = item.name;
           mesh.userData = {
             id: item.id,
             dimensions: item.dimensions,

@@ -10,7 +10,7 @@
     </button>
     <v-text-field variant="underlined" label="Project name" dense :loading="isSaving" :error="!!saveError"
       :error-messages="saveError" required v-model="name" id="name-field"/>
-    <button class="nav-btn">
+    <button class="nav-btn" @click="takeRealisticScreenshot" >
       <span>Buton napred</span>
     </button>
     </div>
@@ -118,6 +118,11 @@ watch(name, (newValue, oldValue) => {
   }, 1000);
 });
 
+
+const takeRealisticScreenshot=()=> {
+  // Тук ще извикаш функцията от EditProject.vue, която прави реалистичен скрийншот
+  editProjectRef.value?.takeRealisticScreenshot();
+}
 </script>
 <style scoped>
 #header {

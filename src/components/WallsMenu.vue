@@ -83,7 +83,7 @@
             </div>
             <div class="input-group">
               <label>Дебелина на стената (м)</label>
-              <input type="number" v-model.number="roomSize.thickness" min="0.05" step="0.05" />
+              <input type="number" v-model.number="wallConfig.thickness" min="0.05" step="0.05" />
             </div>
             <button class="create-btn" @click="handleCreateWall">
               Create Wall

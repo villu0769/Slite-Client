@@ -56,7 +56,7 @@ defineProps({
   visible: Boolean,
   position: {
     type: Object,
-    default: () => ({ x: 0, y: 0 })
+    default: () => ({ x: 0, y: 0,z:-1 })
   },
   objType: {
     type: String
