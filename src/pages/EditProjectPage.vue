@@ -151,6 +151,7 @@ const openRealisticPictureModal = async () => {
   align-items: center;
   padding: 7px 30px;
   padding-bottom: 0;
+  gap: 12px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   z-index: 10;
   background: var(--bg);
@@ -175,24 +176,25 @@ const openRealisticPictureModal = async () => {
   font-weight: 600;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   background: color-mix(in srgb, var(--bg-soft), transparent 50%);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .nav-btn svg {
-  transition: transform 0.2s ease;
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
 }
 
 /* Hover Effects */
 .nav-btn:hover {
   background: color-mix(in srgb, var(--bg-soft), transparent 20%);
   color: var(--text);
-  /* Синьо при ховър */
 }
 
 .nav-btn:hover svg {
   transform: translateX(-3px);
-  /* Стрелката мърда леко наляво */
 }
 
 .nav-btn:active {
@@ -201,6 +203,8 @@ const openRealisticPictureModal = async () => {
 
 .v-input {
   max-width: 400px;
+  flex: 1;
+  min-width: 100px;
 }
 
 #content {
@@ -210,5 +214,103 @@ const openRealisticPictureModal = async () => {
   right: 0;
   bottom: 0;
   display: flex;
+}
+
+/* ==========================================
+   TABLET RESPONSIVE (768px and below)
+========================================== */
+@media screen and (max-width: 768px) {
+  #header {
+    height: 80px;
+    padding: 6px 20px;
+    padding-bottom: 0;
+    gap: 10px;
+  }
+
+  .nav-btn {
+    padding: 12px;
+    font-size: 0.85rem;
+    gap: 6px;
+  }
+
+  .nav-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .nav-btn span {
+    display: none;
+  }
+
+  .v-input {
+    max-width: 250px;
+  }
+
+  #content {
+    top: 80px;
+  }
+}
+
+/* ==========================================
+   SMALL PHONE (520px and below)
+========================================== */
+@media screen and (max-width: 520px) {
+  #header {
+    height: 72px;
+    padding: 6px 12px;
+    padding-bottom: 0;
+    gap: 8px;
+  }
+
+  .nav-btn {
+    padding: 10px;
+    font-size: 0.8rem;
+    gap: 4px;
+  }
+
+  .nav-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .v-input {
+    max-width: 150px;
+    font-size: 0.85rem;
+  }
+
+  #content {
+    top: 72px;
+  }
+}
+
+/* ==========================================
+   TINY PHONE (350px and below)
+========================================== */
+@media screen and (max-width: 350px) {
+  #header {
+    height: 64px;
+    padding: 4px 8px;
+    padding-bottom: 0;
+    gap: 6px;
+  }
+
+  .nav-btn {
+    padding: 8px;
+    font-size: 0.75rem;
+  }
+
+  .nav-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .v-input {
+    max-width: 100px;
+    font-size: 0.8rem;
+  }
+
+  #content {
+    top: 64px;
+  }
 }
 </style>

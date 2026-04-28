@@ -189,7 +189,7 @@ const submitChanges = async () => {
                 localStorage.setItem('username', user.value.username)
             }
 
-            // ЗАМЕНЯМЕ alert() с showNotification()
+        
             showNotification('Профилът е обновен успешно!', 'success')
 
         } else if (activeField.value === 'password') {
@@ -197,12 +197,12 @@ const submitChanges = async () => {
                 currentPassword: editData.value.currentPassword,
                 newPassword: editData.value.newPassword
             })
-            // ЗАМЕНЯМЕ alert() с showNotification()
+        
             showNotification('Паролата е променена успешно!', 'success')
         }
         closeModal()
     } catch (error) {
-        // ЗАМЕНЯМЕ alert() с showNotification()
+    
         showNotification(error.message || "Възникна грешка при запис!", 'error')
     } finally {
         isSaving.value = false;
@@ -220,14 +220,13 @@ const deleteAccount = async () => {
         localStorage.removeItem('role');
         router.push('/login')
     } catch (error) {
-        // ЗАМЕНЯМЕ alert() с showNotification()
+        
         showNotification(error.message || "Грешка при изтриване на акаунта", 'error')
     }
 }
 </script>
 
 <style scoped>
-/* ОСНОВЕН КОНТЕЙНЕР */
 .account-page {
     width: 100%;
     min-height: calc(100vh - 70px);

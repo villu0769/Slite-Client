@@ -77,6 +77,8 @@ const logout = () => {
   justify-content: space-between;
   padding: 0 40px;
   height: 70px;
+  min-height: 52px;
+  gap: 12px;
 
   background: color-mix(in srgb, var(--bg-soft), transparent 15%);
   backdrop-filter: blur(12px);
@@ -121,13 +123,13 @@ const logout = () => {
   font-weight: 500;
   cursor: pointer;
   opacity: 0.6;
-  transition: opacity 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  transition: opacity 0.2s ease, color 0.2s ease, transform 0.15s ease;
 }
 
 .nav-link:hover {
   opacity: 1;
   color: var(--accent);
-  transform: scale(1.04);
+  transform: scale(1.02);
 }
 
 .nav-link.active {
@@ -159,7 +161,7 @@ const logout = () => {
 .theme-btn:hover {
   opacity: 1;
   color: var(--accent);
-  transform: scale(1.1);
+  transform: scale(1.08);
 }
 
 .logout-btn {
@@ -179,12 +181,12 @@ const logout = () => {
 
 .logout-btn:hover {
   opacity: 1;
-  transform: scale(1.04);
+  transform: scale(1.02);
 }
 
 @media screen and (max-width: 768px) {
   .app-header {
-    padding: 0 15px;
+    padding: 0 12px;
     height: 60px;
   }
 
@@ -193,15 +195,27 @@ const logout = () => {
   }
 
   .header-nav {
-    gap: 15px;
+    gap: 8px;
+    flex-shrink: 1;
   }
 
   .nav-link {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    padding: 6px 0;
+    opacity: 0.7;
+  }
+
+  .nav-link span {
+    white-space: nowrap;
   }
 
   .header-right {
-    gap: 8px;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .theme-btn {
+    padding: 6px;
   }
 
   .logout-text {
@@ -209,21 +223,63 @@ const logout = () => {
   }
 
   .logout-btn {
-    padding: 8px;
+    padding: 6px;
   }
 }
 
-@media screen and (max-width: 400px) {
+@media screen and (max-width: 520px) {
+  .app-header {
+    padding: 0 10px;
+    height: 56px;
+  }
+
+  .header-left {
+    gap: 8px;
+  }
+
   .header-nav {
-    gap: 10px;
+    gap: 4px;
   }
 
   .nav-link {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
+    padding: 4px 0;
   }
 
+  .app-logo {
+    height: 24px;
+  }
+}
+
+@media screen and (max-width: 350px) {
   .app-header {
-    padding: 0 10px;
+    padding: 0 8px;
+    height: 52px;
+  }
+
+  .header-nav {
+    gap: 2px;
+  }
+
+  .nav-link {
+    font-size: 0.75rem;
+    padding: 0;
+  }
+
+  .app-logo {
+    height: 22px;
+  }
+
+  .header-right {
+    gap: 4px;
+  }
+
+  .theme-btn {
+    padding: 4px;
+  }
+
+  .logout-btn {
+    padding: 4px;
   }
 }
 </style>

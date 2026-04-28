@@ -39,8 +39,8 @@
 
         <button class="tool-btn" title="Сподели в X (Twitter)" @click="shareOn('twitter')">
           <div class="tool-icon">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 4l16 16M4 20L20 4"></path>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
             </svg>
           </div>
           <span class="tool-name">X</span>
@@ -59,62 +59,100 @@
 
     </div>
   </div>
+  
+  <Notification 
+    :show="notification.show" 
+    :message="notification.message" 
+    :type="notification.type" 
+  />
 </template>
 
-<script>
-export default {
-  name: 'RealisticPictureModal',
-  props: {
-    imageSrc: {
-      type: String,
-      required: true
-    },
-    imageAlt: {
-      type: String,
-      default: '3D Render'
-    }
+<script setup>
+import { reactive } from 'vue';
+import Notification from '../components/Notification.vue';
+
+// Дефиниране на Props
+const props = defineProps({
+  imageSrc: {
+    type: String,
+    required: true
   },
-  methods: {
-    closeModal() {
-      this.$emit('close');
-    },
-    downloadImage() {
-      const link = document.createElement('a');
-      link.href = this.imageSrc;
-      link.download = this.imageAlt || 'render.png';
-      link.click();
-    },
-    shareOn(platform) {
-      const url = window.location.href;
-      const text = `Вижте моя нов 3D проект!`;
-      let shareUrl = '';
-      
-      if (platform === 'facebook') {
-        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
-      } else if (platform === 'twitter') {
-        shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
-      }
-      
-      if (shareUrl) window.open(shareUrl, '_blank', 'width=600,height=400');
-    },
-    copyLink() {
-      navigator.clipboard.writeText(window.location.href);
-      alert('Линкът е копиран!');
-    }
+  imageAlt: {
+    type: String,
+    default: '3D Render'
+  }
+});
+
+// Дефиниране на Emits (за затваряне на модала)
+const emit = defineEmits(['close']);
+
+// Реактивно състояние за известията
+const notification = reactive({ 
+  show: false, 
+  message: '', 
+  type: 'info' 
+});
+
+let notificationTimeout = null;
+
+const showNotify = (msg, type = 'info') => {
+  // Изчистваме предишен таймер, ако има такъв
+  if (notificationTimeout) clearTimeout(notificationTimeout);
+  
+  notification.message = msg;
+  notification.type = type;
+  notification.show = true;
+
+  // Автоматично скриване след 3 секунди
+  notificationTimeout = setTimeout(() => {
+    notification.show = false;
+  }, 3000);
+};
+
+const closeModal = () => {
+  emit('close');
+};
+
+const downloadImage = () => {
+  const link = document.createElement('a');
+  link.href = props.imageSrc;
+  link.download = props.imageAlt || 'render.png';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+const shareOn = (platform) => {
+  const url = window.location.href;
+  const text = `Вижте моя нов 3D проект!`;
+  let shareUrl = '';
+  
+  if (platform === 'facebook') {
+    shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
+  } else if (platform === 'twitter') {
+    shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+  }
+  
+  if (shareUrl) window.open(shareUrl, '_blank', 'width=600,height=400');
+};
+
+const copyLink = async () => {
+  try {
+    await navigator.clipboard.writeText(window.location.href);
+    showNotify('Линкът е копиран в клипборда!', 'info');
+  } catch (err) {
+    showNotify('Грешка при копирането', 'error');
   }
 };
 </script>
 
 <style scoped>
-/* ФОН НА МОДАЛА */
+/* Твоите стилове остават същите, те са екстра */
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px); /* Добавя лек блър за по-модерен вид */
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -122,76 +160,76 @@ export default {
   padding: 20px;
 }
 
-/* СЪДЪРЖАНИЕ НА МОДАЛА */
 .modal-content {
-  background: color-mix(in srgb, var(--bg), transparent 15%);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  background: var(--bg, #fff);
+  border: 1px solid var(--border, #ddd);
+  border-radius: 16px;
   max-width: 650px;
   width: 100%;
   overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
   display: flex;
   flex-direction: column;
 }
 
-/* ХЕДЪР (Базиран на твоя стил) */
 .config-header {
   display: flex;
   align-items: center;
-  gap: 10px;
   padding: 16px 20px;
   border-bottom: 1px solid var(--border);
+  gap: 8px;
 }
 
 .selected-model-name {
   font-weight: 600;
-  font-size: 1rem;
   color: var(--text);
+  font-size: 1rem;
 }
 
 .small-back {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  background: transparent;
+  border: none;
   color: var(--text);
-  border: 1px solid transparent;
   cursor: pointer;
+  padding: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  opacity: 0.6;
 }
 
 .small-back:hover {
-  background: color-mix(in srgb, var(--bg), #000 5%);
-  border-color: var(--border, #ccc);
-  color: var(--accent, #007bff);
+  opacity: 1;
+  transform: scale(1.1);
 }
 
-/* КАРТИНКА */
 .image-container {
-  width: 100%;
-  padding: 20px;
+  background: transparent;
+  padding: 0;
   display: flex;
   justify-content: center;
   align-items: center;
+  flex: 1;
+  min-height: 200px;
+  max-height: 60vh;
+  overflow: auto;
 }
 
 .modal-image {
   max-width: 100%;
-  max-height: 50vh;
+  max-height: 100%;
+  width: auto;
+  height: auto;
   object-fit: contain;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  display: block;
 }
 
-/* БУТОНИ (Взимаме директно твоите класове) */
 .action-grid {
   padding: 20px;
   padding-bottom: 24px;
   border-top: 1px solid var(--border);
-  margin: 0; /* Override-ваме padding-bottom от оригиналния ти grid, за да е центриран тук */
+  margin: 0;
   justify-content: center;
 }
 
@@ -212,7 +250,7 @@ export default {
   border-radius: 12px;
   padding: 18px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   color: var(--text);
   position: relative;
   overflow: hidden;
@@ -234,10 +272,11 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.2s;
+  transition: color 0.15s;
 }
 
-.tool-btn:hover .tool-icon ,.tool-btn:hover .tool-name{
+.tool-btn:hover .tool-icon,
+.tool-btn:hover .tool-name {
   color: var(--accent);
   opacity: 1;
 }
@@ -257,5 +296,179 @@ export default {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* ==========================================
+   TABLET RESPONSIVE (768px and below)
+========================================== */
+@media screen and (max-width: 768px) {
+  .modal-overlay {
+    padding: 16px;
+  }
+
+  .modal-content {
+    border-radius: 12px;
+    max-width: 95vw;
+  }
+
+  .config-header {
+    padding: 14px 16px;
+    gap: 6px;
+  }
+
+  .selected-model-name {
+    font-size: 0.95rem;
+  }
+
+  .image-container {
+    padding: 0;
+    min-height: 180px;
+    max-height: 55vh;
+  }
+
+  .action-grid {
+    padding: 16px;
+    padding-bottom: 20px;
+  }
+
+  .tools-grid {
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    gap: 10px;
+  }
+
+  .tool-btn {
+    padding: 14px;
+    gap: 6px;
+    border-radius: 10px;
+  }
+
+  .tool-icon {
+    width: 26px;
+    height: 26px;
+    margin-bottom: 3px;
+  }
+
+  .tool-name {
+    font-size: 11px;
+  }
+}
+
+/* ==========================================
+   SMALL PHONE (520px and below)
+========================================== */
+@media screen and (max-width: 520px) {
+  .modal-overlay {
+    padding: 12px;
+  }
+
+  .modal-content {
+    border-radius: 12px;
+    max-height: 90vh;
+    max-width: 100vw;
+  }
+
+  .config-header {
+    padding: 12px 14px;
+    gap: 4px;
+  }
+
+  .selected-model-name {
+    font-size: 0.9rem;
+  }
+
+  .image-container {
+    padding: 0;
+    min-height: 160px;
+    max-height: 50vh;
+  }
+
+  .action-grid {
+    padding: 14px;
+    padding-bottom: 16px;
+  }
+
+  .tools-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .tool-btn {
+    padding: 12px;
+    gap: 5px;
+    border-radius: 8px;
+  }
+
+  .tool-icon {
+    width: 24px;
+    height: 24px;
+    margin-bottom: 2px;
+  }
+
+  .tool-name {
+    font-size: 10px;
+  }
+}
+
+/* ==========================================
+   TINY PHONE (350px and below)
+========================================== */
+@media screen and (max-width: 350px) {
+  .modal-overlay {
+    padding: 8px;
+  }
+
+  .modal-content {
+    border-radius: 12px 12px 0 0;
+    max-height: 95vh;
+  }
+
+  .config-header {
+    padding: 10px 12px;
+  }
+
+  .selected-model-name {
+    font-size: 0.85rem;
+  }
+
+  .small-back {
+    padding: 4px;
+  }
+
+  .small-back svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .image-container {
+    padding: 0;
+    min-height: 140px;
+    max-height: 45vh;
+  }
+
+  .action-grid {
+    padding: 12px;
+    padding-bottom: 14px;
+  }
+
+  .tools-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .tool-btn {
+    padding: 10px;
+    gap: 4px;
+    border-radius: 6px;
+  }
+
+  .tool-icon {
+    width: 20px;
+    height: 20px;
+    margin-bottom: 0;
+  }
+
+  .tool-name {
+    font-size: 9px;
+  }
 }
 </style>

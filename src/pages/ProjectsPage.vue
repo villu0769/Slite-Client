@@ -43,13 +43,13 @@
 </template>
 
 <script setup>
-import { computed, reactive } from 'vue' // Добавен е reactive
+import { computed, reactive } from 'vue' 
 import { useRouter } from 'vue-router'
 import { useQuery, useMutation, useQueryClient } from 'vue-query'
 import { fetchAll, createNew } from '../services/projectsService'
 import ProjectPreview from '../components/ProjectPreview.vue'
 import AppHeader from '../components/AppHeader.vue'
-import Notification from '../components/Notification.vue' // Импортираме нотификацията
+import Notification from '../components/Notification.vue' 
 
 const router = useRouter()
 const queryClient = useQueryClient()
@@ -69,28 +69,30 @@ const { data: projectsRef, isLoading, isFetching } = useQuery(
   fetchAll,
   {
     select: (res) => {
-      return res?.projects || [];
+      const rawProjects = res?.projects || [];
+      //сортираме проектите по дата на последна промяна (най-новите първи)
+      return [...rawProjects].sort((a, b) => {
+        const dateA = new Date(a.updatedAt || 0); 
+        const dateB = new Date(b.updatedAt || 0);
+        return dateB - dateA; 
+      });
     }
   }
 )
 const projects = computed(() => projectsRef.value || [])
 
-const addNewProjectMutation = useMutation(() => createNew('Untitled project'), {
+const addNewProjectMutation = useMutation(() => createNew('Неозаглавен проект'), {
   onSuccess: (createdProject) => {
-    // Тук редиректът става веднага, но ако искаш можеш да покажеш success нотификация
     router.push(`/project/${createdProject._id}`);
     queryClient.invalidateQueries('projects');
   },
   onError: (error) => {
-    // ЗАМЕНЯМЕ alert() с нашата нотификация
     showNotification('Грешка при създаване на проект: ' + error.message, 'error');
   },
 });
 
 // Handlers
 const handleAddNewProject = () => {
-  // Може да покажем синя нотификация, докато се създава
-  // showNotification('Създаване на нов проект...', 'info'); 
   addNewProjectMutation.mutate();
 }
 

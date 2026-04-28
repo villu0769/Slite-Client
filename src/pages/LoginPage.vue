@@ -54,11 +54,6 @@
         </button>
       </form>
 
-      <div class="secondary-actions">
-        <a href="#" class="link-sm" @click.prevent="goTo('/forgot-password')">Забравена парола?</a>
-        <a href="#" class="link-sm" @click.prevent="goTo('/help-form')">Помощ</a>
-      </div>
-
       <div class="form-footer">
         <p>Нямаш акаунт? <a href="#" @click.prevent="goTo('/register')">Регистрация</a></p>
       </div>

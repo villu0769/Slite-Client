@@ -11,14 +11,11 @@ export const loadLayout = async (layoutData, manager, maxHeight, scene, perspect
 
   await Promise.all(
     layoutData.map(async (item) => {
-      // --- СТАРА ЧАСТ: Зареждане на мебели (.glb) ---
       try {
         const modelUrl = item.filename;
 
-        // Зареждаме директно от URL-а
         const gltf = await loader.loadAsync(modelUrl);
 
-        // Прилагане на трансформации
         gltf.scene.position.x = item.position.x || 0;
         gltf.scene.position.y = item.position.y || 0;
         gltf.scene.position.z = item.position.z || 0;
@@ -26,13 +23,11 @@ export const loadLayout = async (layoutData, manager, maxHeight, scene, perspect
         if (item.scale) {
           gltf.scene.scale.set(item.scale.x, item.scale.y, item.scale.z);
         } else {
-          // Дефолт, ако няма данни (за да не стане мащаб 0)
           gltf.scene.scale.set(1, 1, 1);
         }
         gltf.scene.name = item.name || item.filename;
         gltf.scene.userData = { id: item.id, filename: item.filename };
 
-        // Fix textures/colors
         gltf.scene.traverse((node) => {
           if (node.isMesh && node.material) {
             const mats = Array.isArray(node.material) ? node.material : [node.material];
@@ -54,12 +49,11 @@ export const loadLayout = async (layoutData, manager, maxHeight, scene, perspect
         }
         scene.add(gltf.scene);
       } catch (err) {
-        console.warn(`Error loading model ${item.filename}:`, err);
+        console.warn(`Грешка при зареждане на модела ${item.filename}:`, err);
       }
     })
   );
 
-  // Camera settings (запазваме си ги както бяха)
   const fov = perspectiveCamera.fov * (Math.PI / 180);
   let cameraZ = Math.abs(maxHeight / 2 / Math.tan(fov / 2));
   cameraZ *= 2.8;

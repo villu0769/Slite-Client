@@ -51,15 +51,14 @@ export const verifyToken = async () => {
     const data = await response.json();
 
     if (!data.isValid) {
-      // Предотвратяваме изтриването на чисто нов токен (Race condition фиксът)
       if (localStorage.getItem('token') === token) {
         localStorage.removeItem('token');
-        localStorage.removeItem('role'); // Добра практика е да триеш и ролята!
+        localStorage.removeItem('role'); 
       }
       return false;
     }
     
-    return true; // Токенът е валиден
+    return true; 
   } catch (error) {
     console.error('Грешка при проверка на токена:', error);
     return false;
@@ -167,8 +166,7 @@ export const updateUserRole = async (userId, role) => {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${token}`
     },
-    // Изпращаме само ролята. Твоят бекенд (updateProfile) ще обнови само нея,
-    // без да пипа email или username.
+    
     body: JSON.stringify({ role }), 
   });
 
