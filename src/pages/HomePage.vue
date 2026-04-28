@@ -1,5 +1,5 @@
 <template>
-  <div class="home-container">
+  <div class="auth-container home-wrapper">
     <div class="glow-orb orb-1"></div>
     <div class="glow-orb orb-2"></div>
     <div class="auth-buttons">
@@ -15,22 +15,22 @@
     </div>
     <div class="glass-card">
       <div class="logo-section">
-        <h1 class="brand-title">Slite<span class="dot">.</span></h1>
-        <p class="brand-subtitle">Пространство за твоите идеи</p>
+        <img src="/src/assets/logo.png" alt="">
+        <p class="brand-subtitle">Пространство за вашите идеи</p>
       </div>
 
       <div class="info-section">
         <p>
-          Проектирай мечтания дом с лекота. Създавай стаи, добавяй мебели
-          и визуализирай интериора в реално време, директно в браузъра си.
+          Проектирайте мечтания дом с лекота. Създавайте стаи, добавяйте мебели
+          и визуализирайте интериор в реално време, директно в браузъра си.
         </p>
       </div>
 
       <div class="actions-section">
         <div v-if="hasToken" class="logged-in-view">
-          <p class="welcome-back">Здравей отново!</p>
+          <p class="welcome-back">Здравейте отново!</p>
           <button class="btn btn-primary" @click="goToApp">
-            Продължи към редактора
+            Продължете към редактора
             <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M5 12h14M12 5l7 7-7 7" />
             </svg>
@@ -40,7 +40,7 @@
     </div>
 
     <div class="footer">
-      <span>&copy; 2026 Slite Project. All rights reserved.</span>
+      <span>&copy; 2026 Slite.</span>
     </div>
   </div>
 </template>
@@ -76,7 +76,9 @@ const goToApp = () => {
 const goToLogin = () => router.push('/login');
 const goToRegister = () => router.push('/register');
 const logout = () => {
-  localStorage.removeItem('token'); // Премахване на токена
+  localStorage.removeItem('token');
+  localStorage.removeItem('username');
+  localStorage.removeItem('role');
   hasToken.value = false; // Обновяване на състоянието
   router.push('/login'); // Връщане към началната страница
 };
@@ -85,131 +87,39 @@ const logout = () => {
 <style scoped>
 /* --- 1. Fonts & Reset --- */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700;900&display=swap');
-
-.home-container {
-  font-family: 'Inter', sans-serif;
-  width: 100vw;
-  height: 100vh;
-
-  /* ПРОМЯНА: Разрешаваме скролването вертикално */
+@import './authStyles.css';
+.home-wrapper {
   overflow-y: auto;
-
-  /* ПРОМЯНА: Скриване на скролбара за Firefox */
   scrollbar-width: none;
-  /* ПРОМЯНА: Скриване на скролбара за IE и Edge */
   -ms-overflow-style: none;
-
-  background-color: #0f1115;
-  background-image:
-    radial-gradient(at 10% 10%, rgba(74, 144, 226, 0.15) 0px, transparent 50%),
-    radial-gradient(at 90% 90%, rgba(140, 82, 255, 0.15) 0px, transparent 50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  color: #ffffff;
 }
-
-/* ПРОМЯНА: Скриване на скролбара за Chrome, Safari и Opera */
-.home-container::-webkit-scrollbar {
+.home-wrapper::-webkit-scrollbar {
   display: none;
 }
 
-/* --- 2. Background Decor (Orbs) --- */
-.glow-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.6;
-  z-index: 1;
-  animation: float 10s infinite ease-in-out;
-}
-
-.orb-1 {
-  width: 400px;
-  height: 400px;
-  background: #4a90e2;
-  /* Slite Blue */
-  top: -100px;
-  left: -100px;
-}
-
-.orb-2 {
-  width: 300px;
-  height: 300px;
-  background: #8c52ff;
-  /* Creative Purple */
-  bottom: -50px;
-  right: -50px;
-  animation-delay: -5s;
-}
-
-@keyframes float {
-
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-
-  50% {
-    transform: translate(20px, 30px);
-  }
-}
-
-/* --- 3. The Glass Card --- */
-.glass-card {
-  position: relative;
-  z-index: 10;
-  width: 90%;
+/* Надграждаме Glass Card, за да е малко по-голям и с анимация */
+.home-wrapper .glass-card {
   max-width: 480px;
   padding: 3rem 2.5rem;
-
-  /* Glassmorphism magic */
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 24px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-
   animation: fadeUp 0.8s ease-out;
+  text-align: center;
 }
 
 @keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* --- 4. Typography --- */
-.brand-title {
-  font-size: 4rem;
-  font-weight: 900;
-  margin: 0;
-  letter-spacing: -2px;
-  background: linear-gradient(135deg, #ffffff 0%, #a5b4fc 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  line-height: 1;
+.logo-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 2rem;
 }
-
-.dot {
-  color: #4a90e2;
-  -webkit-text-fill-color: #4a90e2;
-  /* Override gradient for dot */
+.logo-section img {
+  height: 80px;
+  margin-bottom: 1rem;
 }
-
 .brand-subtitle {
   margin-top: 0.5rem;
   font-size: 1.1rem;
@@ -226,7 +136,7 @@ const logout = () => {
   margin: 0;
 }
 
-/* --- 5. Buttons --- */
+/* --- Навигационни бутони (Горе вдясно) --- */
 .auth-buttons {
   display: flex;
   position: absolute;
@@ -234,30 +144,10 @@ const logout = () => {
   right: 20px;
   gap: 1rem;
   justify-content: center;
+  z-index: 20; /* За да може да се цъкат над орбитите */
 }
 
-.btn {
-  padding: 0.8rem 1.5rem;
-  border-radius: 12px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  border: none;
-  outline: none;
-}
-
-.btn-primary {
-  background: #ffffff;
-  color: #000000;
-}
-
-.btn-primary:hover {
-  background: #e0e0e0;
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(255, 255, 255, 0.15);
-}
-
+/* Вторичен бутон (уникален за Home) */
 .btn-secondary {
   background: rgba(255, 255, 255, 0.05);
   color: #ffffff;
@@ -269,6 +159,7 @@ const logout = () => {
   border-color: #ffffff;
 }
 
+/* --- Допълнителни елементи --- */
 .welcome-back {
   font-size: 0.9rem;
   color: rgba(255, 255, 255, 0.5);
@@ -282,7 +173,6 @@ const logout = () => {
   margin-left: 5px;
 }
 
-/* --- 6. Footer --- */
 .footer {
   position: absolute;
   bottom: 20px;
@@ -290,18 +180,27 @@ const logout = () => {
   color: rgba(255, 255, 255, 0.2);
 }
 
-/* Mobile Responsive */
+/* --- Мобилна адаптация --- */
 @media (max-width: 600px) {
-  .brand-title {
+  .home-wrapper .brand-title {
     font-size: 3rem;
   }
-
+  
+  /* Бутоните горе вдясно на телефон е по-добре да са по-малки, 
+     вместо да падат на нов ред и да закриват екрана */
   .auth-buttons {
-    flex-direction: column;
+    top: 16px;
+    right: 16px;
+    gap: 0.5rem;
   }
-
-  .btn {
-    width: 100%;
+  
+  .auth-buttons .btn {
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+  }
+  
+  .home-wrapper .glass-card {
+    padding: 2.5rem 1.5rem;
   }
 }
 </style>

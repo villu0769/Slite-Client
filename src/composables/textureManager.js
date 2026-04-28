@@ -16,9 +16,9 @@ export const  handleColorChange = (object, colorCode) =>{
         // 1. ПРОВЕРКА ЗА СТЪКЛО И МЕТАЛ
         const matName = (mat.name || '').toLowerCase();
 
-        const isGlass = matName.includes('glass') || (mat.transparent === true && mat.opacity < 1);
-        const isMetal = matName.includes('metal') || matName.includes('chrome') || matName.includes('steel') || matName.includes('aluminum');
-
+        const isGlass = matName.includes('lamp') || matName.includes('glass') || (mat.transparent === true && mat.opacity < 1);
+        const isMetal = matName.includes('metal') || matName.includes('chrom') || matName.includes('steel') || matName.includes('alum')  || matName.includes('keramik');
+          
         // Ако е стъкло или метал, директно прекъсваме и не пипаме този материал
         if (isGlass || isMetal) return;
 
@@ -33,8 +33,6 @@ export const  handleColorChange = (object, colorCode) =>{
           newMat.color.set(colorCode); // .set() приема hex стрингове като '#ff0000'
         }
         
-        newMat.metalness = 0.1;
-        newMat.roughness = 0.6;
         newMat.needsUpdate = true;
 
         // 3. ПРИЛАГАНЕ НА НОВИЯ МАТЕРИАЛ
@@ -67,10 +65,11 @@ export async function handleTextureChange(object, textureFilename) {
   const loader = new THREE.TextureLoader();
 
   try {
-    const texture = await loader.loadAsync(`/app/pics/textures/${textureFilename}`);
+    const texture = await loader.loadAsync(`/app/src/assets/textures/${textureFilename}`);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(1, 1);
+    if(textureFilename.includes('flooring')) texture.repeat.set(2, 2);
+    else texture.repeat.set(1.5,1.5);
     texture.colorSpace = THREE.SRGBColorSpace;
 
     // --- ОБХОЖДАНЕ И ПОДМЯНА НА МАТЕРИАЛИ ---
@@ -80,30 +79,19 @@ export async function handleTextureChange(object, textureFilename) {
         // Помощна функция за безопасна подмяна
         const applyToMaterialSafely = (mat, index = null) => {
           if (!mat) return;
-
-          // 1. ПРОВЕРКА ЗА СТЪКЛО И МЕТАЛ
           const matName = (mat.name || '').toLowerCase();
-
-          const isGlass = matName.includes('glass') || (mat.transparent === true && mat.opacity < 1);
-          const isMetal = matName.includes('metal') || matName.includes('chrome') || matName.includes('steel') || matName.includes('aluminum');
-
+          const isGlass = matName.includes('lamp') || matName.includes('glass') || (mat.transparent === true && mat.opacity < 1);
+          const isMetal =matName.includes('metal') || matName.includes('chrom') || matName.includes('steel') || matName.includes('alum')  || matName.includes('keramik');
           // Ако е стъкло или метал, директно прекъсваме и не пипаме този материал
           if (isGlass || isMetal) return;
-          // 2. КЛОНИРАНЕ (За да не променяме всички инстанции на този модел в сцената)
           const newMat = mat.clone();
           newMat.map = texture;
           newMat.needsUpdate = true;
-          if (newMat.color) {
-            newMat.color.setHex(0xffffff);
-          }
-          
-            newMat.metalness = 0.1;
-            newMat.roughness = 0.6;
-          // 3. ПРИЛАГАНЕ НА НОВИЯ МАТЕРИАЛ
+          if (newMat.color) newMat.color.setHex(0xffffff); // премахваме цвета на материала за всеки случай
           if (index !== null) {
-            child.material[index] = newMat; // Ако е масив от материали
+            child.material[index] = newMat; 
           } else {
-            child.material = newMat;        // Ако е единичен материал
+            child.material = newMat;       
           }
         };
 

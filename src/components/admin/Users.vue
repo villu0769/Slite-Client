@@ -23,16 +23,25 @@
         </thead>
         <tbody>
           <tr v-for="user in data?.users" :key="user._id">
-            <td class="id-col">..{{ user._id.slice(-4) }}</td>
-            <td>{{ user.username || user.name }}</td>
-            <td>{{ user.email }}</td>
-            <td>
-              <span :class="['role-badge', user.role ? user.role.toLowerCase() : 'user']">
-                {{ user.role || 'User' }}
-              </span>
+            <td class="id-col" data-label="ID">..{{ user._id.slice(-4) }}</td>
+            <td data-label="Потребител">{{ user.username || user.name }}</td>
+            <td data-label="Email">{{ user.email }}</td>
+            <td data-label="Роля">
+              <div class="role-select-wrapper">
+                <select 
+                  :value="user.role || 'user'" 
+                  @change="handleRoleChange(user._id, $event)"
+                  :class="['role-select', user.role === 'admin' ? 'admin' : 'user']"
+                  :disabled="updatingUserId === user._id"
+                >
+                  <option value="user" v-if="user.username !== localUsername">Обикновен потребител</option>
+                  <option value="admin">Админ</option>
+                </select>
+                <span v-if="updatingUserId === user._id" class="saving-spinner">⏳</span>
+              </div>
             </td>
-            <td>
-              <button v-if="user.role !== 'admin'"  class="btn btn-delete" @click="handleDeleteUser(user._id)">Delete</button>
+            <td data-label="Действия">
+              <button v-if="user.role !== 'admin'" class="btn btn-delete" @click="handleDeleteUser(user._id)">Delete</button>
             </td>
           </tr>
         </tbody>
@@ -102,12 +111,17 @@
 <script setup>
 import { ref, reactive } from 'vue';
 import { useQuery, useMutation, useQueryClient } from 'vue-query';
-import { fetchUsers, registerUser,deleteUser } from '../../services/authService';
+// ДОБАВЕНО: Импорт на updateUserRole от сървиса
+import { fetchUsers, registerUser, deleteUser, updateUserRole } from '../../services/authService';
+import { localId } from 'three/tsl';
 
 const queryClient = useQueryClient();
 const page = ref(1);
 const limit = 10;
 const isRegistering = ref(false);
+const localUsername = localStorage.getItem('username');
+// ДОБАВЕНО: Следим кое ID се обновява в момента за loading ефекта
+const updatingUserId = ref(null); 
 
 // 1. Fetch Users
 const { data, isLoading, isError, error } = useQuery(
@@ -139,7 +153,8 @@ const openRegisterModal = () => {
 };
 const closeRegisterModal = () => isRegistering.value = false;
 
-// 4. Mutation
+// 4. Mutations
+// Мутация за регистрация
 const mutation = useMutation(registerUser, {
   onSuccess: () => {
     queryClient.invalidateQueries(['users']);
@@ -147,9 +162,39 @@ const mutation = useMutation(registerUser, {
   }
 });
 
+// ДОБАВЕНО: Мутация за обновяване на роля
+const updateRoleMutation = useMutation(
+  ({ userId, newRole }) => updateUserRole(userId, newRole),
+  {
+    onSuccess: () => {
+      queryClient.invalidateQueries(['users']);
+      updatingUserId.value = null;
+    },
+    onError: (err) => {
+      alert("Грешка при промяна на ролята: " + err.message);
+      queryClient.invalidateQueries(['users']); // Връща първоначалната роля в UI при грешка
+      updatingUserId.value = null;
+    }
+  }
+);
+
 const handleRegister = () => {
-  // Изпращаме целия обект form
-  mutation.mutate({ email:form.email,username:form.username,password:form.password,role:form.role });
+  mutation.mutate({ email: form.email, username: form.username, password: form.password, role: form.role });
+};
+
+// ДОБАВЕНО: Хендлър за промяна на селекта
+const handleRoleChange = (userId, event) => {
+  const newRole = event.target.value;
+  
+  if (!confirm(`Сигурни ли сте, че искате да промените ролята на този потребител на ${newRole}?`)) {
+    // Връщаме старата стойност, ако се откаже
+    const originalRole = data.value.users.find(u => u._id === userId).role || 'user';
+    event.target.value = originalRole;
+    return;
+  }
+
+  updatingUserId.value = userId;
+  updateRoleMutation.mutate({ userId, newRole });
 };
 
 const handleDeleteUser = async (userId) => {
@@ -160,7 +205,6 @@ const handleDeleteUser = async (userId) => {
     alert("Failed to delete user: " + err.message);
   });
 };
-
 </script>
 
 <style scoped>

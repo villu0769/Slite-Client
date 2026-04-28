@@ -1,0 +1,339 @@
+#projects-page {
+  width: 100%;
+  min-height: 100vh;
+  height: 100vh;
+  background: var(--bg);
+  padding-bottom: 110px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* Thin/le scrollbar for Webkit browsers */
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: transparent transparent; /* Firefox */
+}
+
+/* Thin/invisible scrollbar for Webkit browsers */
+#projects-page::-webkit-scrollbar {
+  width: 6px;
+  background: transparent;
+}
+#projects-page::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+/* =========================================
+   2. PROJECT CARD (Vertical Layout)
+   ========================================= */
+.project-card {
+  z-index: 50;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+  
+  /* Glassmorphism */
+  background: color-mix(in srgb, var(--bg-soft), transparent 20%);
+  border: 1px solid var(--border);
+  box-shadow: var(--menu-shadow);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.project-card:hover {
+  box-shadow: var(--menu-shadow-hover);
+  transform: translateY(-4px);
+}
+
+.header-info {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 12px;
+}
+
+.header-preview img {
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  display: block;
+  border-radius: 8px;
+}
+
+.header-details {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  padding-right: 60px;
+  gap: 4px;
+}
+
+.header-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-date {
+  font-size: 0.85rem;
+  color: color-mix(in srgb, var(--text), transparent 40%);
+}
+
+.header-actions {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+}
+
+.delete-btn {
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text);
+  opacity: 0.6;
+  transition: all 0.2s;
+}
+
+.delete-btn:hover {
+  opacity: 1;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger), transparent 85%);
+  transform: scale(1.05);
+}
+
+.delete-btn:active {
+  transform: scale(0.95);
+}
+
+.delete-btn:disabled {
+  cursor: not-allowed;
+  transform: none;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+}
+
+/* =========================================
+   3. PAGE LAYOUT
+   ========================================= */
+.page-container {
+  width: 100%;
+  margin: 0 auto;
+  padding: 50px;
+  box-sizing: border-box;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--text);
+}
+
+.btn-primary {
+  background-color: var(--bluey);
+  color: var(--text);
+  border: none;
+  padding: 10px 20px;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s, filter 0.2s;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  padding: 40px;
+  width: 100%;
+}
+
+.btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.projects-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px;
+  justify-content: flex-start;
+}
+
+.project-card-wrapper {
+  width: 30%;
+  max-width: 90vw;
+  min-width: 300px;
+}
+
+/* =========================================
+   4. MOBILE RESPONSIVENESS
+   ========================================= */
+
+/* За таблети и по-малки екрани */
+@media screen and (max-width: 1024px) {
+  .project-card-wrapper {
+    width: 45%; /* По 2 карти на ред */
+  }
+  .page-container {
+    padding: 30px; /* Намаляваме излишното пространство */
+  }
+}
+
+/* За мобилни телефони */
+@media screen and (max-width: 576px) {
+  .page-container {
+    padding: 16px; /* Още по-малък padding за телефон */
+  }
+
+  .page-header {
+    flex-direction: column; /* Слагаме заглавието и бутона един над друг */
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .btn-primary {
+    width: 100%; /* Бутонът става на цял ред за лесно цъкане */
+    text-align: center;
+  }
+
+  .projects-grid {
+    gap: 16px;
+  }
+
+  .project-card-wrapper {
+    width: 100%; /* 1 карта на ред */
+    min-width: unset;
+  }
+
+  /* Трансформираме картата в хоризонтална (Списъчен изглед) */
+  .project-card {
+    flex-direction: row;
+    align-items: center;
+    padding: 12px;
+  }
+
+  .header-info {
+    flex-direction: row;
+    align-items: center;
+    flex: 1;
+    min-width: 0; /* Позволява на дългия текст да се съкрати с многоточие */
+  }
+
+  .header-preview img {
+    width: 60px; /* Смаляваме картинката */
+    height: 60px;
+    border-radius: 6px;
+  }
+
+  .header-details {
+    padding: 0;
+    flex: 1;
+    min-width: 0;
+    gap: 2px;
+  }
+
+  .header-title {
+    font-size: 1rem;
+  }
+
+  .header-date {
+    font-size: 0.75rem;
+  }
+
+  /* Местим бутона за изтриване на правилното място */
+  .header-actions {
+    position: static; /* Премахваме absolute, за да стои до текста */
+    flex-shrink: 0; /* Не му позволяваме да се смачква */
+    margin-left: 8px;
+  }
+
+  .delete-btn {
+    width: 44px; /* Леко увеличаваме зоната за докосване */
+    height: 44px;
+  }
+}
+/* =========================================
+   5. EMPTY STATE (Когато няма проекти)
+   ========================================= */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 60px 20px;
+  background: color-mix(in srgb, var(--bg-soft), transparent 50%);
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  margin-top: 20px;
+}
+
+.empty-icon {
+  width: 64px;
+  height: 64px;
+  color: color-mix(in srgb, var(--text), transparent 60%);
+  margin-bottom: 16px;
+}
+
+.empty-state h2 {
+  font-size: 1.25rem;
+  color: var(--text);
+  margin: 0 0 8px 0;
+}
+
+.empty-state p {
+  font-size: 0.95rem;
+  color: color-mix(in srgb, var(--text), transparent 40%);
+  margin: 0 0 24px 0;
+  max-width: 300px;
+}
+
+/* Мобилна корекция за празното състояние */
+@media screen and (max-width: 576px) {
+  .empty-state {
+    padding: 40px 16px;
+  }
+  
+  .empty-icon {
+    width: 48px;
+    height: 48px;
+  }
+}

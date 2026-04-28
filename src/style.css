@@ -13,5 +13,6 @@ html, body, #app {
   margin: 0;
   padding: 0;
   scrollbar-width: none;
+  background: var(--bg);
   overflow: hidden; /* ВАЖНО: Спира скрола на прозореца */
 }

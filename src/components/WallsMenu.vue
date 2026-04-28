@@ -9,7 +9,7 @@
             <polyline points="12 19 5 12 12 5"></polyline>
           </svg>
         </button>
-        <span>{{ selectedCategory ? currentCategoryLabel : 'Build Structure' }}</span>
+        <span>{{ selectedCategory ? currentCategoryLabel : '' }}</span>
       </div>
 
       <div class="header-actions">
@@ -46,47 +46,89 @@
           <div class="items-header" v-if="!(selectedCategory === 'doors' && selectedDoorModel) &&
             selectedCategory !== 'room' &&
             selectedCategory !== 'walls'"> <span class="items-subtitle">
-              {{ `Select ${currentCategoryLabel} Type` }}
+              {{ `Избери тип ${currentCategoryLabel}` }}
             </span>
           </div>
 
           <div v-if="selectedCategory === 'room'" class="room-form">
             <div class="input-group">
               <label>Width (m)</label>
-              <input type="number" v-model.number="roomSize.width" min="1" step="0.5" />
+              <div class="custom-number">
+                <input type="number" v-model.number="roomSize.width" min="1" step="0.5" />
+                <div class="step-controls">
+                  <button class="step-btn" @click="stepValue(roomSize, 'width', 0.5, 1)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+                  <button class="step-btn" @click="stepValue(roomSize, 'width', -0.5, 1)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                </div>
+              </div>
             </div>
             <div class="input-group">
-              <label>Length (m)</label>
-              <input type="number" v-model.number="roomSize.length" min="1" step="0.5" />
+              <label>Дължина (м)</label>
+              <div class="custom-number">
+                <input type="number" v-model.number="roomSize.length" min="1" step="0.5" />
+                <div class="step-controls">
+                  <button class="step-btn" @click="stepValue(roomSize, 'length', 0.5, 1)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+                  <button class="step-btn" @click="stepValue(roomSize, 'length', -0.5, 1)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                </div>
+              </div>
             </div>
             <div class="input-group">
-              <label>Height (m)</label>
-              <input type="number" v-model.number="roomSize.height" min="1" step="0.5" />
+              <label>Височина (м)</label>
+              <div class="custom-number">
+                <input type="number" v-model.number="roomSize.height" min="1" step="0.5" />
+                <div class="step-controls">
+                  <button class="step-btn" @click="stepValue(roomSize, 'height', 0.5, 1)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+                  <button class="step-btn" @click="stepValue(roomSize, 'height', -0.5, 1)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                </div>
+              </div>
             </div>
             <div class="input-group">
               <label>Дебелина на стените (м)</label>
-              <input type="number" v-model.number="roomSize.thickness" min="0.05" step="0.05" />
+              <div class="custom-number">
+                <input type="number" v-model.number="roomSize.thickness" min="0.05" step="0.05" />
+                <div class="step-controls">
+                  <button class="step-btn" @click="stepValue(roomSize, 'thickness', 0.05, 0.05)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+                  <button class="step-btn" @click="stepValue(roomSize, 'thickness', -0.05, 0.05)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                </div>
+              </div>
             </div>
             <button class="create-btn" @click="handleCreateRoom">
-              Create Room
+              Създай
             </button>
           </div>
 
           <div v-else-if="selectedCategory === 'walls'" class="room-form">
             <div class="input-group">
-              <label>Length (m)</label>
-              <input type="number" v-model.number="wallConfig.length" min="0.5" step="0.5" />
+              <label>Дължина (м)</label>
+              <div class="custom-number">
+                <input type="number" v-model.number="wallConfig.length" min="0.5" step="0.5" />
+                <div class="step-controls">
+                  <button class="step-btn" @click="stepValue(wallConfig, 'length', 0.5, 0.5)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+                  <button class="step-btn" @click="stepValue(wallConfig, 'length', -0.5, 0.5)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                </div>
+              </div>
             </div>
             <div class="input-group">
-              <label>Height (m)</label>
-              <input type="number" v-model.number="wallConfig.height" min="1" step="0.1" />
+              <label>Височина (м)</label>
+              <div class="custom-number">
+                <input type="number" v-model.number="wallConfig.height" min="1" step="0.1" />
+                <div class="step-controls">
+                  <button class="step-btn" @click="stepValue(wallConfig, 'height', 0.1, 1)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+                  <button class="step-btn" @click="stepValue(wallConfig, 'height', -0.1, 1)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                </div>
+              </div>
             </div>
             <div class="input-group">
               <label>Дебелина на стената (м)</label>
-              <input type="number" v-model.number="wallConfig.thickness" min="0.05" step="0.05" />
+              <div class="custom-number">
+                <input type="number" v-model.number="wallConfig.thickness" min="0.05" step="0.05" />
+                <div class="step-controls">
+                  <button class="step-btn" @click="stepValue(wallConfig, 'thickness', 0.05, 0.05)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+                  <button class="step-btn" @click="stepValue(wallConfig, 'thickness', -0.05, 0.05)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                </div>
+              </div>
             </div>
             <button class="create-btn" @click="handleCreateWall">
-              Create Wall
+              Създай
             </button>
           </div>
 
@@ -115,15 +157,27 @@
                   <span class="selected-model-name">{{ selectedDoorModel.name }}</span>
                 </div>
                 <div class="input-group">
-                  <label>Width (m)</label>
-                  <input type="number" v-model.number="doorConfig.width" step="0.05" min="0.5" max="4.0" />
+                  <label>Дължина (м)</label>
+                  <div class="custom-number">
+                    <input type="number" v-model.number="doorConfig.width" step="0.05" min="0.5" max="4.0" />
+                    <div class="step-controls">
+                      <button class="step-btn" @click="stepValue(doorConfig, 'width', 0.05, 0.5, 4.0)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+                      <button class="step-btn" @click="stepValue(doorConfig, 'width', -0.05, 0.5, 4.0)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                    </div>
+                  </div>
                 </div>
                 <div class="input-group">
-                  <label>Height (m)</label>
-                  <input type="number" v-model.number="doorConfig.height" step="0.05" min="1.0" max="3.5" />
+                  <label>Височина (м)</label>
+                  <div class="custom-number">
+                    <input type="number" v-model.number="doorConfig.height" step="0.05" min="1.0" max="3.5" />
+                    <div class="step-controls">
+                      <button class="step-btn" @click="stepValue(doorConfig, 'height', 0.05, 1.0, 3.5)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+                      <button class="step-btn" @click="stepValue(doorConfig, 'height', -0.05, 1.0, 3.5)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                    </div>
+                  </div>
                 </div>
                 <button class="create-btn" @click="handleAddDoor">
-                  Add Door
+                  Създай
                 </button>
               </div>
             </transition>
@@ -154,24 +208,41 @@
                   <span class="selected-model-name">{{ selectedWindowModel.name }}</span>
                 </div>
                 <div class="input-group">
-                  <label>Width (m)</label>
-                  <input type="number" v-model.number="windowConfig.width" step="0.05" min="0.5" max="5.0" />
+                  <label>Дължина (м)</label>
+                  <div class="custom-number">
+                    <input type="number" v-model.number="windowConfig.width" step="0.05" min="0.5" max="5.0" />
+                    <div class="step-controls">
+                      <button class="step-btn" @click="stepValue(windowConfig, 'width', 0.05, 0.5, 5.0)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+                      <button class="step-btn" @click="stepValue(windowConfig, 'width', -0.05, 0.5, 5.0)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                    </div>
+                  </div>
                 </div>
                 <div class="input-group">
-                  <label>Height (m)</label>
-                  <input type="number" v-model.number="windowConfig.height" step="0.05" min="0.5" max="3.0" />
+                  <label>Височина (м)</label>
+                  <div class="custom-number">
+                    <input type="number" v-model.number="windowConfig.height" step="0.05" min="0.5" max="3.0" />
+                    <div class="step-controls">
+                      <button class="step-btn" @click="stepValue(windowConfig, 'height', 0.05, 0.5, 3.0)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+                      <button class="step-btn" @click="stepValue(windowConfig, 'height', -0.05, 0.5, 3.0)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                    </div>
+                  </div>
                 </div>
                 <div class="input-group">
-                  <label>Височина от пода (m)</label>
-                  <input type="number" v-model.number="windowConfig.heightFromFloor" step="0.05" min="0.5" max="3.0" />
+                  <label>Височина от пода (м)</label>
+                  <div class="custom-number">
+                    <input type="number" v-model.number="windowConfig.heightFromFloor" step="0.05" min="0.5" max="3.0" />
+                    <div class="step-controls">
+                      <button class="step-btn" @click="stepValue(windowConfig, 'heightFromFloor', 0.05, 0.5, 3.0)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+                      <button class="step-btn" @click="stepValue(windowConfig, 'heightFromFloor', -0.05, 0.5, 3.0)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                    </div>
+                  </div>
                 </div>
                 <button class="create-btn" @click="handleAddWindow">
-                  Add Window
+                  Създай
                 </button>
               </div>
             </transition>
           </div>
-
 
           <div v-else class="tools-grid">
             <button v-for="item in visibleItems" :key="item.id" class="tool-btn" @click="handleToolClick(item.action)">
@@ -187,9 +258,11 @@
 
   </div>
 </template>
+
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue';
 import {getNonFurnitureCategory} from '../services/furnitureService'
+
 // --- PROPS & EMITS ---
 const props = defineProps({
   isOpen: { type: Boolean, required: true },
@@ -213,10 +286,18 @@ const doorConfig = reactive({ width: 0.9, height: 2.1 });
 const selectedWindowModel = ref(null);
 const windowConfig = reactive({ width: 1.2, height: 1.5, heightFromFloor: 1.0 });
 
+// --- Универсална функция за бутоните +/- ---
+function stepValue(obj, key, step, min = -Infinity, max = Infinity) {
+  let val = obj[key] || 0;
+  val = Number((val + step).toFixed(3));
+  if (val < min) val = min;
+  if (val > max) val = max;
+  obj[key] = val;
+}
+
 // Функция за изтегляне на моделите от бекенда
 async function fetchModels() {
   try {
-    // ВАЖНО: Смени пътя, ако твоят endpoint за категории е друг!
     const doorsCat = await getNonFurnitureCategory('doors');
 
     if (doorsCat && doorsCat.items) {
@@ -228,7 +309,6 @@ async function fetchModels() {
       }));
     }
 
-    // Търсим категория 'windows'
     const windowsCat = await getNonFurnitureCategory('windows');
     if (windowsCat && windowsCat.items) {
       windowModels.value = windowsCat.items.map(item => ({
@@ -243,7 +323,6 @@ async function fetchModels() {
   }
 }
 
-// Извикваме заявката при зареждане на компонента
 onMounted(() => {
   fetchModels();
   window.addEventListener('resize', keepInViewport);
@@ -272,28 +351,28 @@ const defaultIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 const categories = computed(() => [
   {
     id: 'room',
-    name: 'Add Room',
+    name: 'Помещение',
     hasSubItems: true,
     icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M3 9h18"/></svg>',
     disabled: false
   },
   {
     id: 'walls',
-    name: 'Walls',
+    name: 'Стена',
     hasSubItems: true,
     icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 22h20M4 22V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v16"/></svg>',
     disabled: false
   },
   {
     id: 'doors',
-    name: 'Doors',
+    name: 'Врата',
     hasSubItems: true,
     icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22V6M6 22v-4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v4M4 22h16"/></svg>',
     disabled: !props.hasWalls
   },
   {
     id: 'windows',
-    name: 'Windows',
+    name: 'Прозорец',
     hasSubItems: true,
     icon: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg>',
     disabled: !props.hasWalls
@@ -346,14 +425,13 @@ function handleCreateWall() {
   });
 }
 
-
 function handleAddWindow() {
   if (!selectedWindowModel.value) return;
   emit('action', {
-    type: 'add-model-window',      // Уникален тип за прозорци
+    type: 'add-model-window',
     width: windowConfig.width,
     height: windowConfig.height,
-    heightFromFloor: windowConfig.heightFromFloor,           // Можем да добавим и тази конфигурация
+    heightFromFloor: windowConfig.heightFromFloor,
     filename: selectedWindowModel.value.filename
   });
   goBack();
@@ -386,16 +464,18 @@ const menuStyle = computed(() => ({
 }));
 
 const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
+
 function handleAddDoor() {
   if (!selectedDoorModel.value) return;
 
   emit('action', {
-    type: 'add-model-door',       // Уникален тип за това действие
+    type: 'add-model-door',
     width: doorConfig.width,
     height: doorConfig.height,
     filename: selectedDoorModel.value.filename
   });
 }
+
 let dragging = false;
 let dragStart = { px: 0, py: 0, sx: 0, sy: 0 };
 
@@ -442,4 +522,72 @@ onBeforeUnmount(() => {
 <style scoped>
 @import './WallsMenuStyle.css';
 @import './EditProjectStyle.css';
+
+/* --- Стилизация за Custom Number Input с вертикални стрелки --- */
+.custom-number {
+  display: flex;
+  align-items: stretch; /* Разпъва вътрешните елементи по височина */
+  background: color-mix(in srgb, var(--bg-soft, #333), transparent 20%);
+  border: 1px solid var(--border, #555);
+  color:var(--text);
+  border-radius: 4px;
+  overflow: hidden; 
+  width: 100%;
+  height: 34px; /* Малко по-високо, за да събере 2 бутона комфортно */
+}
+
+.custom-number input[type="number"] {
+  flex-grow: 1;
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left; /* Може да го смениш на center, ако предпочиташ */
+  padding: 0 10px;
+  font-size: 0.95rem;
+  -moz-appearance: textfield; /* Скрива стрелките във Firefox */
+}
+
+.custom-number input[type="number"]:focus {
+  outline: none;
+}
+
+/* Скриваме базовите стрелки на браузърите */
+.custom-number input[type="number"]::-webkit-outer-spin-button,
+.custom-number input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.step-controls {
+  display: flex;
+  flex-direction: column;
+  width: 26px; /* Широчина на стрелките */
+  border-left: 1px solid var(--border, #555);
+}
+
+.step-btn {
+  flex: 1; /* Взема половината височина */
+  background: var(--bluey); 
+  color: #fff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  padding: 0;
+}
+
+.step-btn:first-child {
+  border-bottom: 1px solid var(--border, #555); /* Разделител между двете стрелки */
+}
+
+.step-btn:hover {
+  background: color-mix(in srgb, var(--bluey) 70%, #000);
+}
+.step-btn:active {
+  background: color-mix(in srgb, var(--bluey) 50%, #000);
+}
 </style>

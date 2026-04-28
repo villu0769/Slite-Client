@@ -1,11 +1,12 @@
 :root {
-  --bg: #ffffff;
-  --bg-soft: #e2e6ed;
+  --bg: #e2e6ed;
+  --bg-soft:  #ffffff;;
   --text: #111827;
   --border: #d1d5db;
-  --accent: #9babce;
-  --scene-background: #b5bbcf;
+  --accent: #6e7b98;
+  --bluey:rgba(139, 183, 199, 0.5);
   --menu-shadow: 0 0 6px rgba(0,0,0,.2);
+  --danger:rgba(214, 21, 41, 0.9);
 }
 
 [data-theme='dark'] {
@@ -13,9 +14,11 @@
   --bg-soft: #1f2937;
   --text: #e5e7eb;
   --border: #374151;
-  --accent: #213350;
+  --accent: #64748e;
+  --bluey: rgba(68, 90, 127, 0.5);
   --scene-background: #1f232a;
   --menu-shadow: 0 10px 30px rgba(0,0,0,.5);
+  --danger:rgba(143, 21, 41, 0.9);
 }
 * {
   transition:

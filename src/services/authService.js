@@ -16,7 +16,7 @@ export const fetchUsers = async (page = 1, limit = 10) => {
   if (!response.ok) {
     throw new Error(result.message || 'Грешка при зареждане на потребители');
   }
-  return result.data; // Връща { message, data: { users, pagination } }
+  return result.data; 
 };
 
 export const registerUser = async ({email,username,password,role='user'}) => {
@@ -36,10 +36,9 @@ export const registerUser = async ({email,username,password,role='user'}) => {
   const { token, user } = result;
   return { token, user };
 };
-
-export const verifyToken = async () =>{
+export const verifyToken = async () => {
   const token = localStorage.getItem('token');
-  if (!token) return;
+  if (!token) return false;
 
   try {
     const response = await fetch(`${API_URL}/api/auth/verify`, {
@@ -52,10 +51,18 @@ export const verifyToken = async () =>{
     const data = await response.json();
 
     if (!data.isValid) {
-      localStorage.removeItem('token');
+      // Предотвратяваме изтриването на чисто нов токен (Race condition фиксът)
+      if (localStorage.getItem('token') === token) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('role'); // Добра практика е да триеш и ролята!
+      }
+      return false;
     }
+    
+    return true; // Токенът е валиден
   } catch (error) {
     console.error('Грешка при проверка на токена:', error);
+    return false;
   }
 }
 
@@ -70,7 +77,7 @@ export const loginUser = async ({email,password}) => {
 
   const result = await response.json();
 
-  if (!response.ok) {
+  if (!response.ok ) {
     throw new Error(result.message);
   }
   const { token, user } = result;
@@ -85,7 +92,6 @@ export const deleteUser = async (userId) => {
       "Authorization": `Bearer ${localStorage.getItem('token')}`
     },
   });
-
   const result = await response.json();
 
   if (!response.ok) {
@@ -94,46 +100,83 @@ export const deleteUser = async (userId) => {
   const { token, user } = result;
   return { token, user };
 };
-/*
-export const forgottenPassword = async (email) => {
-  const response = await fetch(
-    "https://localhost:7095/api/Notification/forgotten-password",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email }),
+export const getUserProfile = async (username) => {
+  const response = await fetch(`${API_URL}/api/auth/${username}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+       "Authorization": `Bearer ${localStorage.getItem('token')}`
     }
-  );
-
-  if (!response.ok) {
-  //  const message = await parseApiError(response);
-    throw new Error('error');
-  }
+  });
 
   const result = await response.json();
-  return result.data?.message || "Password reset request succeeded.";
-};
-
-export const resetPassword = async (token, newPassword) => {
-  const response = await fetch(
-    "https://localhost:7095/api/Notification/reset-password",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ token, newPassword }),
-    }
-  );
 
   if (!response.ok) {
-    const message = await parseApiError(response);
-    throw new Error(message);
+    throw new Error(result.message || 'Грешка при зареждане на профила');
   }
+  return result.user; 
+};
+
+export const updateProfile = async (userId, { username, email }) => {
+  const token = localStorage.getItem('token');
+  
+  const response = await fetch(`${API_URL}/api/auth/${userId}/profile`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
+    },
+    body: JSON.stringify({ username, email }),
+  });
 
   const result = await response.json();
-  return { message: result.data?.message || "Password reset successful." };
+
+  if (!response.ok) {
+    throw new Error(result.message || 'Грешка при обновяване на профила');
+  }
+  
+  return result; 
 };
-*/
+
+export const changePassword = async (userId, { currentPassword, newPassword }) => {
+  const token = localStorage.getItem('token');
+  
+  const response = await fetch(`${API_URL}/api/auth/${userId}/password`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
+    },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.message || 'Грешка при смяна на паролата');
+  }
+  
+  return result; 
+};
+export const updateUserRole = async (userId, role) => {
+  const token = localStorage.getItem('token');
+  
+  const response = await fetch(`${API_URL}/api/auth/${userId}/profile`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
+    },
+    // Изпращаме само ролята. Твоят бекенд (updateProfile) ще обнови само нея,
+    // без да пипа email или username.
+    body: JSON.stringify({ role }), 
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.message || 'Грешка при промяна на ролята');
+  }
+  
+  return result; 
+};

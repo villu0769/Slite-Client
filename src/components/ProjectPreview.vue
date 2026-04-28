@@ -1,21 +1,22 @@
 <template>
-
   <div class="project-card">
-    <div class="header-info"  @click="handleOnClick(props.projectData._id)">
+    <div class="header-info" @click="handleOnClick(props.projectData._id)">
       <div class="header-preview">
-        <img :src="projectImage || 'https://via.placeholder.com/150'" alt="Project Preview" />
+        <img :src="props.projectData.previewImage?props.projectData.previewImage:'/app/project-placeholder.jpg'" alt="Project Preview" />
       </div>
-
-      <span class="header-title">{{ props.projectData.name }}</span>
+      <div class="header-details">
+        <span class="header-title">{{ props.projectData.name }}</span>
+        <span class="header-date">
+          Последна промяна: {{ formatDate(props.projectData.lastModified) }}
+        </span>
+      </div>
     </div>
-
     <div class="header-actions">
-      <button class="action-btn delete-btn" @click="deleteProject" title="Delete Project" :disabled="isDeleting"
+      <button class="action-btn delete-btn" @click.stop="deleteProject" title="Delete Project" :disabled="isDeleting"
         :style="{ opacity: isDeleting ? 0.5 : 1 }">
         <svg v-if="isDeleting" class="spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
         </svg>
-
         <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
           stroke-linecap="round" stroke-linejoin="round">
           <polyline points="3 6 5 6 21 6"></polyline>
@@ -25,43 +26,51 @@
     </div>
   </div>
 </template>
-<script setup>
-import { useRouter } from 'vue-router'
-import { ref } from 'vue';
 
+<script setup>
+import { useRouter } from 'vue-router';
+import { ref } from 'vue';
+import { useConfirm } from '../composables/useConfirm';
+
+const { showConfirm } = useConfirm();
 const props = defineProps({
   projectData: {
     type: Object,
     required: true,
   },
 })
-
-const router = useRouter()
-
+const router = useRouter();
 const handleOnClick = (id) => {
   router.push(`/project/${id}`);
-}
+};
+const isDeleting = ref(false);
+const formatDate = (dateString) => {
+  if (!dateString) return 'Няма данни';
 
-const isDeleting = ref(false); // За лоудинг състояние на бутона
+  const date = new Date(dateString);
 
-// Функция за изтриване
-const deleteProject = async () => {
-  // 1. Потвърждение от потребителя
-  const confirmed = window.confirm("Are you sure you want to delete this project? This action cannot be undone.");
-  
+  if (isNaN(date.getTime())) return 'Невалидна дата';
+
+  // 3. Форматиране (Пример: 22.04.2026 г., 15:30 ч.)
+  return new Intl.DateTimeFormat('bg-BG', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date);
+};
+const deleteProject = async (event) => {
+  if (event) event.stopPropagation();
+  const confirmed = await showConfirm("Сигурни ли сте, че искате да изтриете този проект?");
   if (!confirmed) return;
-  // Взимаме ID-то (от пропс или от обекта data)
   const id = props.projectData._id; 
-
   if (!id) {
     console.error("No project ID found!");
     return;
   }
-
   isDeleting.value = true;
-
   try {
-    // 2. Изпращаме заявка към Backend-a
     const response = await fetch(`https://slite-api.onrender.com/api/projects/${id}/delete`, {
       method: 'POST',
       headers: {
@@ -69,9 +78,7 @@ const deleteProject = async () => {
         Authorization: `Bearer ${localStorage.getItem('token')}`,
       }
     });
-
     if (response.ok) {
-      // 3. Ако е успешно, пренасочваме или обновяваме списъка
       alert("Project deleted successfully.");
     } else {
       const errorData = await response.json();
@@ -84,9 +91,8 @@ const deleteProject = async () => {
     isDeleting.value = false;
   }
 };
-
 </script>
 
 <style scoped>
-@import './projectsPageStyle.css';
+@import '../pages/projectsPageStyle.css';
 </style>

@@ -33,31 +33,6 @@
             <div class="gradient-indicator" :style="{ left: `${(h / 360) * 100}%` }"></div>
           </div>
         </div>
-
-        <div class="rgb-inputs">
-          <div class="rgb-field-group">
-            <input type="number" min="0" max="255" :value="rgbValue.r" @input="onRgbInputChange($event, 'r')"
-              class="rgb-field" />
-            <label class="section-label rgb-label">R</label>
-          </div>
-          <div class="rgb-field-group">
-            <input type="number" min="0" max="255" :value="rgbValue.g" @input="onRgbInputChange($event, 'g')"
-              class="rgb-field" />
-            <label class="section-label rgb-label">G</label>
-          </div>
-          <div class="rgb-field-group">
-            <input type="number" min="0" max="255" :value="rgbValue.b" @input="onRgbInputChange($event, 'b')"
-              class="rgb-field" />
-            <label class="section-label rgb-label">B</label>
-            <div class="mode-selector">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <path d="m6 9 6 6 6-6" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
       </div>
     </transition>
 
@@ -169,22 +144,6 @@ function updateHueFromCoords(e) {
   x = Math.max(0, Math.min(x, rect.width));
   h.value = Math.round((x / rect.width) * 360);
 }
-
-/* ---------------- RGB INPUT LOGIC ---------------- */
-function onRgbInputChange(e, component) {
-  const val = parseInt(e.target.value);
-  if (isNaN(val)) return;
-
-  const currentRgb = { ...rgbValue.value };
-  currentRgb[component] = Math.max(0, Math.min(val, 255));
-
-  // Конвертираме RGB обратно към HSL, за да актуализирамеInternal State
-  const updatedHsl = rgbToHsl(currentRgb.r, currentRgb.g, currentRgb.b);
-  h.value = updatedHsl.h;
-  s.value = updatedHsl.s;
-  l.value = updatedHsl.l;
-}
-
 /* ---------------- КОНВЕРТИРАНЕ НА ЦВЕТОВЕ (UTILS) ---------------- */
 function hexToHsl(hex) {
   // Hex to RGB
@@ -323,11 +282,11 @@ onUnmounted(() => {
   margin-top: 8px;
   left: 0;
   width: 200px;
-  height: 220px;
-  background: white;
+  height: 150px;
+  background: color-mix(in srgb, var(--bg-soft), transparent 15%);
   border-radius: 8px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-  border: 1px solid #ced4da;
+  border: 1px solid var(--border);
   z-index: 1000;
   display: flex;
   flex-direction: column;
@@ -433,12 +392,6 @@ onUnmounted(() => {
   background: linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);
 }
 
-.rgb-inputs {
-  display: flex;
-  gap: 10px;
-  margin-top: 5px;
-}
-
 .rgb-field-group {
   display: flex;
   flex-direction: column;
@@ -456,12 +409,6 @@ onUnmounted(() => {
   padding: 2px 5px;
   font-size: 13px;
   text-align: center;
-}
-
-input[type=number]::-webkit-inner-spin-button,
-input[type=number]::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
 }
 
 .rgb-label {

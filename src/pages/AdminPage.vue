@@ -1,6 +1,7 @@
 <template>
+  <AppHeader />
   <div class="admin-page">
-    <div class="drawer">
+    <aside class="drawer">
       <nav class="menu">
         <button 
           v-for="item in menuItems" 
@@ -10,91 +11,141 @@
         >
           {{ item.label }}
         </button>
-        
-        <button class="menu-item" @click="useTheme().toggleTheme">
-          Switch theme
-        </button>
       </nav>
-    </div>
-    
-    <div class="content">
-      <component :is="currentComponent" />
-    </div>
+    </aside>
+    <main class="content">
+      <KeepAlive>
+        <component :is="currentComponent" />
+      </KeepAlive>
+    </main>
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue';
+import AppHeader from '../components/AppHeader.vue';
 import Users from '../components/admin/Users.vue';
 import FurnitureModelsManager from '../components/admin/FurnitureModelsManager.vue';
-import { useTheme } from '../composables/useTheme';
 
-// 2. State (замества data())
 const activeMenu = ref('users');
-
 const menuItems = [
-  { id: 'users', label: 'Users' },
-  {id: 'models', label: 'Furniture Models Manager'}
+  { id: 'users', label: 'Потребители' },
+  { id: 'models', label: 'Модели' }
 ];
-
-// 3. Computed (замества computed property)
 const currentComponent = computed(() => {
   const componentMap = {
     users: Users,
     models: FurnitureModelsManager
   };
-  // Връщаме компонента или null, ако няма съвпадение (за settings например)
   return componentMap[activeMenu.value] || null;
 });
 </script>
 
 <style scoped>
-/* Стиловете остават абсолютно същите */
 .admin-page {
   display: flex;
-  height: 100vh;
-  color:var(--text);
-  /* Добавяме преход за гладка смяна на темите */
-  transition: background 0.3s ease, color 0.3s ease;
+  /* Изваждаме височината на хедъра (примерно 70px), за да нямаме глобален скрол */
+  height: calc(100vh - 70px);
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
 }
 
+/* --- СТРАНИЧНО МЕНЮ (DESKTOP) --- */
 .drawer {
-  width: 290px;
-  /* Използвай CSS променливи, които се сменят от useTheme */
-  background: var(--bg); 
-  border-right:var(--border);
+  width: 260px;
+  background: color-mix(in srgb, var(--bg-soft, #fff), transparent 30%);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
 }
 
 .menu {
   display: flex;
   flex-direction: column;
-  padding: 0;
+  padding: 16px 0;
+  gap: 4px;
 }
 
 .menu-item {
-  padding: 12px 20px;
+  padding: 14px 24px;
   border: none;
   background: none;
   text-align: left;
   cursor: pointer;
   border-left: 4px solid transparent;
-  transition: all 0.3s ease;
-  color: inherit;
+  transition: all 0.2s ease;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 500;
+  opacity: 0.7;
 }
 
 .menu-item:hover {
-  background: var(--bg-hover, rgba(0,0,0,0.05));
+  background: color-mix(in srgb, var(--text), transparent 95%);
+  opacity: 1;
 }
 
 .menu-item.active {
-  background-color: rgba(25, 118, 210, 0.1);
+  /* Използваме акцентния цвят на темата за по-добра консистентност */
+  background: color-mix(in srgb, var(--accent), transparent 90%);
+  border-left-color: var(--accent);
+  color: var(--accent);
+  opacity: 1;
   font-weight: 600;
 }
 
+/* --- ОСНОВНО СЪДЪРЖАНИЕ --- */
 .content {
   flex: 1;
   overflow-y: auto;
-  background-color: var(--bg, #ffffff);
-  color: var(--text, #333);
+  background: var(--bg);
+  padding: 24px;
+}
+
+/* ==========================================
+   MOBILE RESPONSIVENESS
+========================================== */
+@media screen and (max-width: 768px) {
+  .admin-page {
+    flex-direction: column;
+  }
+
+  /* Чекмеджето става навигационна лента отгоре */
+  .drawer {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .menu {
+    flex-direction: row;
+    padding: 0;
+    overflow-x: auto;
+    /* Скриване на скролбара на мобилни за по-чист вид */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .menu::-webkit-scrollbar {
+    display: none;
+  }
+
+  .menu-item {
+    white-space: nowrap; /* Не позволява на текста да пада на нов ред */
+    border-left: none;
+    border-bottom: 3px solid transparent;
+    padding: 16px 20px;
+  }
+
+  .menu-item.active {
+    border-left-color: transparent;
+    border-bottom-color: var(--accent);
+  }
+  
+  .content {
+    padding: 16px; /* По-малко разстояние на телефон */
+  }
 }
 </style>

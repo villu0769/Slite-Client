@@ -42,8 +42,6 @@ export const loadLayout = async (layoutData, manager, maxHeight, scene, perspect
               if (m.aoMap) m.aoMap.encoding = THREE.sRGBEncoding;
               m.needsUpdate = true;
             });
-            node.castShadow = true;
-            node.receiveShadow = true;
           }
         });
         if (item.texture) {

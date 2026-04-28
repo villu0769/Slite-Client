@@ -1,101 +1,109 @@
 <template>
-
   <div id="header">
     <button class="nav-btn" @click="goBack" title="Back to Projects">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"
+        stroke-linecap="round" stroke-linejoin="round">
         <line x1="19" y1="12" x2="5" y2="12"></line>
         <polyline points="12 19 5 12 12 5"></polyline>
       </svg>
-      <span>Back to Projects</span>
+      <span>Обратно към проектите</span>
     </button>
-    <v-text-field variant="underlined" label="Project name" dense :loading="isSaving" :error="!!saveError"
-      :error-messages="saveError" required v-model="name" id="name-field"/>
-    <button class="nav-btn" @click="takeRealisticScreenshot" >
-      <span>Buton napred</span>
+    <v-text-field variant="underlined" label="Име на проекта" dense :loading="isSaving" :error="!!saveError"
+      :error-messages="saveError" required v-model="name" id="name-field" />
+    <button class="nav-btn" @click="openRealisticPictureModal" title="Създай фотореалистично изображение">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+        <circle cx="12" cy="13" r="4"></circle>
+      </svg>
+      <span>Снимай</span>
     </button>
-    </div>
+  </div>
   <div id="content">
-    <Sidebar @start-drag="onStartDragFromMenu" @action="handleSidebarAction" :hasWalls="hasWalls"/>
-    <EditProject v-if="projectData" :projectData="projectData" ref="editProjectRef" @has-walls="handleWallsUpdate" />
+    <Sidebar v-if="!isMobileOrTablet" @start-drag="onStartDragFromMenu" @action="handleSidebarAction"
+      :hasWalls="hasWalls" />
+
+    <EditProject v-if="projectData" :projectData="projectData" :isMobileOrTablet="isMobileOrTablet" ref="editProjectRef"
+      @has-walls="handleWallsUpdate" />
   </div>
 
+  <RealisticPictureModal v-if="isModalOpen" :imageSrc="generatedImageSrc" @close="isModalOpen = false" />
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, computed, watch, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useQuery } from 'vue-query';
 import Sidebar from '../components/Sidebar.vue';
 import EditProject from '../components/EditProject.vue';
+import RealisticPictureModal from '../components/RealisticPictureModal.vue';
 import { getProjectById, updateProjectName } from '../services/projectsService';
-import { useRouter } from 'vue-router';
 
 const router = useRouter();
+const route = useRoute();
+const id = route.params.id;
 
 function goBack() {
   router.push('/projects');
 }
+
 const editProjectRef = ref(null);
 const hasWalls = ref(false);
+const isModalOpen = ref(false);
+const generatedImageSrc = ref('');
+
+// --- НОВО: Засичане на мобилно устройство или таблет ---
+const isMobileOrTablet = ref(false);
+
+onMounted(() => {
+  // 1. Проверка чрез User-Agent за популярни мобилни и таблет операционни системи
+  const userAgentCheck = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  // 2. Проверка за тъчскрийн поддръжка (помага за някои по-нови iPad-и, които се представят като Mac)
+  const isTouchDevice = navigator.maxTouchPoints > 0 || 'ontouchstart' in window;
+
+  isMobileOrTablet.value = userAgentCheck || (isTouchDevice && window.innerWidth <= 900);
+});
 
 function handleWallsUpdate(value) {
   hasWalls.value = value;
 }
 
 function onStartDragFromMenu(item) {
-  // forward to EditProject's method
   editProjectRef.value?.startDragFromMenu(item);
 }
-function handleSidebarAction(payload) {
-  // Проверка за безопасност
-  if (!payload) return;
 
-  // 1. Ако създаваме стая
+function handleSidebarAction(payload) {
+  if (!payload) return;
   if (payload.type === 'create-room') {
-    editProjectRef.value?.createRoom(payload.width, payload.length,payload.height,payload.thickness);
-  } 
-  else if (payload.type === 'create-wall') {
-    editProjectRef.value?.createWall(payload.length, payload.height,payload.thickness);
-  }
-  // 2. Ако добавяме врата (НОВОТО)
-  else if (payload.type === 'add-model-door') {
-    // Извикваме новата функция в EditProject.vue и подаваме целия payload
-    // (защото в payload-а има width, height, modelUrl)
+    editProjectRef.value?.createRoom(payload.width, payload.length, payload.height, payload.thickness);
+  } else if (payload.type === 'create-wall') {
+    editProjectRef.value?.createWall(payload.length, payload.height, payload.thickness);
+  } else if (payload.type === 'add-model-door') {
     editProjectRef.value?.addDoorToWallCenter(payload);
-  }
-else if (payload.type === 'add-model-window') {
+  } else if (payload.type === 'add-model-window') {
     editProjectRef.value?.addWindowToWallCenter(payload);
-  }
-  // 3. Ако е просто текст (напр. 'add-wall-brick' или други стари бутони)
-  else if (typeof payload === 'string') {
+  } else if (typeof payload === 'string') {
     console.log('Simple action:', payload);
-    // Тук може да добавиш логика за старите бутони, ако още ги ползваш
   }
 }
-// route
-const route = useRoute();
-const id = route.params.id;
 
-// project fetch
 const { data: projectDataRef } = useQuery(
   ['project-data', id],
   () => getProjectById(id)
 );
 
 const projectData = computed(() => projectDataRef.value || null);
-
-// local state
 const name = ref('');
 const isSaving = ref(false);
 const saveError = ref(null);
-// когато projectData дойде → сетваме name
+
 watch(projectData, (project) => {
   if (project?.name) {
     name.value = project.name;
   }
 }, { immediate: true });
 
-// debounce и ъпдейт на име
 let debounceTimer = null;
 watch(name, (newValue, oldValue) => {
   if (newValue === oldValue) return;
@@ -103,12 +111,10 @@ watch(name, (newValue, oldValue) => {
   if (newValue?.trim() == projectData.value?.name) return;
 
   clearTimeout(debounceTimer);
-
   debounceTimer = setTimeout(async () => {
     try {
       isSaving.value = true;
       saveError.value = null;
-
       await updateProjectName(id, newValue);
     } catch (e) {
       saveError.value = 'Error saving project name.';
@@ -118,12 +124,19 @@ watch(name, (newValue, oldValue) => {
   }, 1000);
 });
 
+// ПРОМЕНЕНА ФУНКЦИЯ: Взима снимката и отваря модала
+const openRealisticPictureModal = async () => {
+  const imageDataUrl = await editProjectRef.value?.takeRealisticScreenshot();
 
-const takeRealisticScreenshot=()=> {
-  // Тук ще извикаш функцията от EditProject.vue, която прави реалистичен скрийншот
-  editProjectRef.value?.takeRealisticScreenshot();
+  if (imageDataUrl) {
+    generatedImageSrc.value = imageDataUrl; // Подаваме URL-а към променливата
+    isModalOpen.value = true;               // Отваряме модала
+  } else {
+    console.error("Не успяхме да генерираме снимка.");
+  }
 }
 </script>
+
 <style scoped>
 #header {
   position: fixed;
@@ -145,17 +158,18 @@ const takeRealisticScreenshot=()=> {
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border)
 }
-#header *{
+
+#header * {
   z-index: 11 !important;
 }
+
 .nav-btn {
   display: flex;
   align-items: center;
-  gap: 8px; /* Разстояние между стрелката и текста */
-  
+  gap: 8px;
   border: none;
   border-radius: 8px;
-  padding: 10px;
+  padding: 14px;
   color: color-mix(in srgb, var(--text), transparent 40%);
   height: fit-content;
   font-weight: 600;
@@ -172,19 +186,23 @@ const takeRealisticScreenshot=()=> {
 /* Hover Effects */
 .nav-btn:hover {
   background: color-mix(in srgb, var(--bg-soft), transparent 20%);
-  color: var(--text); /* Синьо при ховър */
+  color: var(--text);
+  /* Синьо при ховър */
 }
 
 .nav-btn:hover svg {
-  transform: translateX(-3px); /* Стрелката мърда леко наляво */
+  transform: translateX(-3px);
+  /* Стрелката мърда леко наляво */
 }
 
 .nav-btn:active {
   transform: scale(0.98);
 }
-.v-input{
+
+.v-input {
   max-width: 400px;
 }
+
 #content {
   position: absolute;
   top: 90px;

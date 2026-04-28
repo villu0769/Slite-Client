@@ -77,3 +77,21 @@ export async function updateProjectName(projectId, name) {
 
   return result.data;
 }
+
+export const uploadPreview = async (projectId, imageBlob) =>{
+  const formData = new FormData();
+  formData.append('preview', imageBlob, 'preview.jpg'); 
+  const response = await fetch(`${API_URL}/api/projects/${projectId}/preview`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`
+    },
+    body: formData,
+  });
+  const data = await response.json();
+  if (response.status === 429) {
+    console.log(`Трябва да изчакате още ${data.minutesLeft} минути преди ново обновяване.`);
+  } else if (response.ok) {
+    console.log('Успешно обновено:', data.previewImage);
+  }
+}

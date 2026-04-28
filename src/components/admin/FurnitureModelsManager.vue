@@ -3,12 +3,12 @@
     <div class="header-actions">
       <div class="title-area">
         <button v-if="selectedCategory" class="btn btn-secondary" @click="goBack" title="Back to Categories">
-          &larr; Back
+          &larr; Назад
         </button>
-        <h2>{{ selectedCategory ? `Items in ${currentCategoryLabel}` : 'Furniture Categories' }}</h2>
+        <h2>{{ selectedCategory ? `Модели в ${currentCategoryLabel}` : 'Категории' }}</h2>
       </div>
       <button class="btn btn-primary" @click="openAddModal">
-        + {{ selectedCategory ? 'Add Item' : 'Add Category' }}
+        + {{ selectedCategory ? 'Добави модел' : 'Добави категория' }}
       </button>
     </div>
 
@@ -18,25 +18,25 @@
       <table class="users-table">
         <thead>
           <tr>
-            <th>Category Name</th>
+            <th>Име на категория</th>
             <th>ID</th>
-            <th>Items Count</th>
-            <th class="actions-col">Actions</th>
+            <th>Брой модели</th>
+            <th class="actions-col">Действия</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="cat in categories" :key="cat._id" @click="openCategory(cat._id)" class="clickable-row">
-            <td><strong>{{ cat.name }}</strong></td>
-            <td class="id-col">{{ cat._id }}</td>
-            <td>{{ cat.items ? cat.items.length : 0 }}</td>
-            <td class="actions-col" @click.stop>
+            <td data-label="Category Name"><strong>{{ cat.name }}</strong></td>
+            <td class="id-col" data-label="ID">{{ cat._id }}</td>
+            <td data-label="Items Count">{{ cat.items ? cat.items.length : 0 }}</td>
+            <td class="actions-col" data-label="Actions" @click.stop>
               <button v-if="!cat.non_furniture_type" class="btn btn-delete" @click="deleteCategory(cat._id)" title="Delete Category">
-                Delete
+                Изтрий
               </button>
             </td>
           </tr>
           <tr v-if="categories.length === 0">
-            <td colspan="4" class="state-msg">No categories found.</td>
+            <td colspan="4" class="state-msg empty-row">Няма намерени категории.</td>
           </tr>
         </tbody>
       </table>
@@ -46,24 +46,23 @@
       <table class="users-table">
         <thead>
           <tr>
-            <th>Item Name</th>
-            <th>Filename</th>
-            <th class="actions-col">Actions</th>
+            <th>Име на модела</th>
+            <th>Име на файл</th>
+            <th class="actions-col">Действия</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="item in visibleItems" :key="item.filename">
-           
-            <td><strong>{{ item.name }}</strong></td>
-            <td class="id-col">{{ item.filename }}</td>
-            <td class="actions-col">
-              <button  class="btn btn-delete" @click="deleteItem(selectedCategory,item.filename)" title="Delete Item">
-                Delete
+            <td data-label="Item Name"><strong>{{ item.name }}</strong></td>
+            <td class="id-col" data-label="Filename">{{ item.filename }}</td>
+            <td class="actions-col" data-label="Actions">
+              <button class="btn btn-delete" @click="deleteItem(selectedCategory,item.filename)" title="Delete Item">
+                Изтрий
               </button>
             </td>
           </tr>
           <tr v-if="visibleItems.length === 0">
-            <td colspan="4" class="state-msg">No items in this category.</td>
+            <td colspan="4" class="state-msg empty-row">Няма намерени модели в тази категория.</td>
           </tr>
         </tbody>
       </table>
@@ -73,23 +72,23 @@
       <div v-if="showModal" class="modal-backdrop" @click.self="closeModal">
         <div class="glass-modal">
           <div class="modal-header">
-            <h3>{{ modalMode === 'category' ? 'Add New Category' : 'Add New Item' }}</h3>
+            <h3>{{ modalMode === 'category' ? 'Добави нова категория' : 'Добави нов модел' }}</h3>
             <button class="btn-close" @click="closeModal">&times;</button>
           </div>
 
           <form @submit.prevent="submitForm">
             <div class="form-group">
-              <label>Name</label>
-              <input type="text" v-model="formData.name" required placeholder="Enter name..." />
+              <label>Име</label>
+              <input type="text" v-model="formData.name" required placeholder="Въведете име..." />
             </div>
 
             <template v-if="modalMode === 'item'">
               <div class="form-group">
-                <label>Thumbnail Image (.jpg, .png)</label>
+                <label>Изображение (.jpg, .png)</label>
                 <input type="file" accept="image/*" @change="e => handleFile(e, 'pic')" required />
               </div>
               <div class="form-group">
-                <label>3D Model (.gltf, .glb)</label>
+                <label>3D Модел (.gltf, .glb)</label>
                 <input type="file" accept=".gltf,.glb" @change="e => handleFile(e, 'model')" required />
               </div>
             </template>
@@ -97,7 +96,7 @@
             <div class="modal-actions">
               <button type="button" class="btn btn-secondary" @click="closeModal">Cancel</button>
               <button type="submit" class="btn btn-primary" :disabled="isUploading">
-                {{ isUploading ? 'Saving...' : 'Save' }}
+                {{ isUploading ? 'Запис...' : 'Запази' }}
               </button>
             </div>
             <p v-if="uploadError" class="error-msg">{{ uploadError }}</p>

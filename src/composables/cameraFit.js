@@ -34,16 +34,14 @@ export const  fitPerspectiveCameraToBox=(camera, box, controls)=> {
   const center = box.getCenter(new THREE.Vector3());
   const sphere = box.getBoundingSphere(new THREE.Sphere());
   const radius = sphere.radius * FIT_MARGIN;
-
   const fov = (camera.fov * Math.PI) / 180;
   const distance = radius / Math.sin(fov / 2);
 
   const offset = new THREE.Vector3(0, radius * 0.6, distance * 1.05);
   camera.position.copy(center).add(offset);
-
   camera.lookAt(center);
   camera.updateProjectionMatrix();
-
+  center.set(0, 0, -10);
   if (controls) {
     controls.target.copy(center);
     controls.update();

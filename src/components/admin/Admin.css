@@ -126,9 +126,10 @@
 .btn:active { transform: scale(0.98); }
 
 .btn-primary { 
-    background-color: var(--bg);
-    color: #fff;
+    background-color: var(--bluey);
+    color: var(--text);
     border: var(--border);
+    font-weight: 670;
 }
 
 .btn-secondary { 
@@ -281,4 +282,150 @@
     font-size: 0.7rem;
     color: var(--text);
     border: var(--border);
+}
+.role-select-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Използваме основата на .role-badge от admin.css */
+.role-select {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+  text-align: center;
+}
+
+.role-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Същите цветове като .role-badge.admin */
+.role-select.admin {
+  background: rgba(255, 99, 71, 0.2); 
+  color: #ff6347; 
+  border: 1px solid rgba(255, 99, 71, 0.4); 
+}
+
+/* Същите цветове като .role-badge.user */
+.role-select.user {
+  background: rgba(74, 144, 226, 0.2); 
+  color: #4a90e2; 
+  border: 1px solid rgba(74, 144, 226, 0.4); 
+}
+
+/* Стилизиране на опциите вътре в селекта, за да спазват тъмната/светлата тема */
+.role-select option {
+  background: var(--bg);
+  color: var(--text);
+  font-weight: normal;
+}
+
+.saving-spinner {
+  font-size: 0.8rem;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media screen and (max-width: 768px) {
+    /*трансформиране на таблицата */
+    .users-table, 
+    .users-table tbody, 
+    .users-table tr, 
+    .users-table td {
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .users-table thead {
+        display: none;
+    }
+    /*редовете стават правоъгълници (карти)*/
+    .users-table tr {
+        margin-bottom: 1rem;
+        background: var(--bg-soft);
+        border: var(--border);
+        border-radius: 8px;
+        padding: 8px 12px;
+    }
+
+        /* 1. Оправяме горната част с бутоните да не се смачква */
+    .header-actions {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .title-area {
+        flex-wrap: wrap;
+    }
+
+    /* Премахваме hover ефекта за картите на мобилен, за да не мига при скрол с пръст */
+    .clickable-row:hover {
+        background-color: var(--bg-soft);
+    }
+
+    /* Стилизираме всяка клетка да използва flexbox */
+    .users-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05); /* Лека разделителна линия */
+        padding: 12px 0;
+        text-align: right;
+    }
+
+    /* Махаме линията на последната клетка в картата */
+    .users-table td:last-child {
+        border-bottom: none;
+    }
+
+    /* 3. Извеждаме името на колоната (data-label) отляво */
+    .users-table td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        color: var(--text);
+        opacity: 0.6;
+        margin-right: 15px;
+        text-align: left;
+    }
+
+    /* Оправяме празните съобщения (когато няма данни), за да не се счупят от ::before псевдоелемента */
+    .users-table td.empty-row {
+        justify-content: center;
+        text-align: center;
+        border-bottom: none;
+    }
+    
+    .users-table td.empty-row::before {
+        display: none;
+    }
+
+    .glass-modal {
+        width: 95%;
+        padding: 1.5rem;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    
+    .modal-actions {
+        flex-direction: column-reverse; /* Бутонът "Затвори" минава отдолу */
+    }
+    
+    .modal-actions .btn {
+        width: 100%;
+        text-align: center;
+    }
 }

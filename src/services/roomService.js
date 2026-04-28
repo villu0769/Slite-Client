@@ -6,14 +6,14 @@ import { handleTextureChange, handleColorChange } from '../composables/textureMa
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const baseMaterialWall = new THREE.MeshStandardMaterial({
-    color: 0xffffff, roughness: 0.7,
-    metalness: 0.1,
+    color: 0xffffff, roughness: 0.6,
+    metalness: 0.25,
     side: THREE.DoubleSide
   });
 
   const baseMaterialFloor = new THREE.MeshStandardMaterial({
-    color: 0xba9eab, roughness: 0.7,
-    metalness: 0.2,
+    color: 0xba9eab, roughness: 0.6,
+    metalness: 0.3,
   });
 
 export const createRoomGeometry = (width, length, height, WALL_THICKNESS) => {
@@ -30,9 +30,8 @@ export const createRoomGeometry = (width, length, height, WALL_THICKNESS) => {
   // Подът си остава прост Box
   const floorGeo = new THREE.BoxGeometry(width, 0.1, length);
   const floor = new THREE.Mesh(floorGeo, baseMaterialFloor);
-  floor.castShadow = true;
-  floor.receiveShadow = true;
   floor.name = 'Под';
+  floor.position.set(0, 0.05, 0);
   floor.userData = { type: 'floor', roomId: roomEntry.id, dimensions: { width, height: 0.1, depth: length } };
 
   objs.push(floor);
@@ -78,9 +77,6 @@ export const createRoomGeometry = (width, length, height, WALL_THICKNESS) => {
     const geometry = new THREE.BoxGeometry(cfg.size.w, cfg.size.h, cfg.size.d);
     const wallMesh = new THREE.Mesh(geometry, baseMaterialWall.clone());
 
-    wallMesh.castShadow = true;
-    wallMesh.receiveShadow = true;
-
     // Позиционираме
     wallMesh.position.set(cfg.pos.x, cfg.pos.y, cfg.pos.z);
 
@@ -93,7 +89,6 @@ export const createRoomGeometry = (width, length, height, WALL_THICKNESS) => {
       id: wallId,
       type: 'wall',
       roomId: roomEntry.id,
-      // Запазваме "чистите" размери на BoxGeometry-то
       dimensions: { width: cfg.size.w, height: cfg.size.h, depth: cfg.size.d }
     };
 
@@ -155,7 +150,6 @@ export const createWallGeometry = (length, height, WALL_THICKNESS) => {
       id: wallId,
       type: 'wall',
       roomId: roomEntry.id,
-      // Запазваме "чистите" размери на BoxGeometry-то
       dimensions: { width: cfg.size.w, height: cfg.size.h, depth: cfg.size.d }
     };
 
@@ -181,8 +175,6 @@ export const createCeilingGeometry = (roomId, width, depth, yPosition, thickness
   const geometry = new THREE.BoxGeometry(width, thickness, depth);
   const material = baseMaterialWall.clone(); // Бял таван по подразбиране
   const ceilingMesh = new THREE.Mesh(geometry, material);
-  ceilingMesh.castShadow = true;
-  ceilingMesh.receiveShadow = true;
   // Задаваме само Y позицията (височината). 
   // X и Z ще ги вземем от пода малко по-късно, за да съвпаднат идеално.
   ceilingMesh.position.set(0, yPosition, 0);
@@ -215,9 +207,6 @@ export const createCeilingGeometry = (roomId, width, depth, yPosition, thickness
 // Инициализираме лоудъра веднъж
 const loader = new GLTFLoader();
 export const loadRoomsGeometry = async (roomsData, scene) => {
-  
-  
-
   if (!roomsData || !Array.isArray(roomsData)) return;
 
   for (const room of roomsData) {
@@ -236,13 +225,11 @@ export const loadRoomsGeometry = async (roomsData, scene) => {
             const doorGroup = new THREE.Group();
 
             // 2. Създаваме Страна А
-            const sideA = gltf.scene.clone(); // Clone scene logic
+            const sideA = gltf.scene.clone();
             // Клониране на материали за Side A
             sideA.traverse((child) => {
               if (child.isMesh) {
                 if (child.material) child.material = child.material.clone();
-                child.castShadow = true;
-                child.receiveShadow = true;
               }
             });
 
@@ -251,15 +238,30 @@ export const loadRoomsGeometry = async (roomsData, scene) => {
             sideB.traverse((child) => {
               if (child.isMesh) {
                 if (child.material) child.material = child.material.clone();
-                child.castShadow = true;
-                child.receiveShadow = true;
               }
             });
 
-            // 4. Настройки на вътрешните мешове
-            if (item.scale) {
+            // 4. НОВО: Динамично изчисляване на мащаба спрямо dimensions!
+            if (item.dimensions) {
+              const box = new THREE.Box3().setFromObject(sideA);
+              const rawSize = new THREE.Vector3();
+              box.getSize(rawSize);
+
+              const scaleX = item.dimensions.width / rawSize.x;
+              const scaleY = item.dimensions.height / rawSize.y;
+              // Добавяме 4см към дълбочината, за да пробие стената
+              const targetDepth = item.dimensions.depth + 0.04; 
+              const scaleZ = targetDepth / rawSize.z;
+
+              sideA.scale.set(scaleX, scaleY, scaleZ);
+              sideB.scale.set(scaleX, scaleY, scaleZ);
+              
+              sideB.rotation.y = Math.PI;
+            } else if (item.scale) {
+              // Fallback, ако случайно няма dimensions
               sideA.scale.set(item.scale.x, item.scale.y, item.scale.z);
-              sideB.scale.set(item.scale.x, item.scale.y, -item.scale.z);
+              sideB.scale.set(item.scale.x, item.scale.y, item.scale.z);
+              sideB.rotation.y = Math.PI;
             }
 
             // Добавяме ги в групата
@@ -288,16 +290,14 @@ export const loadRoomsGeometry = async (roomsData, scene) => {
               type: 'door',
               roomId: room.id || room._id,
               wallId: item.wallId,
+              dimensions: item.dimensions,
               filename: item.filename,
               texture: item.texture ?? null
             };
-
             scene.add(doorGroup);
-
           } catch (err) {
             console.error(`Error loading door ${item.id}:`, err);
           }
-
         }
         else if (item.type === 'window') {
           if (!item.filename) continue;
@@ -305,51 +305,73 @@ export const loadRoomsGeometry = async (roomsData, scene) => {
           try {
             const gltf = await loader.loadAsync(item.filename);
 
-            // Създаваме група и за прозореца (за консистентност с вратите и по-лесно управление)
             const windowGroup = new THREE.Group();
-            const windowModel = gltf.scene.clone();
 
-            // Клонираме материалите и пускаме сенките
-            windowModel.traverse((child) => {
-              if (child.isMesh) {
-                if (child.material) child.material = child.material.clone();
-                child.castShadow = true;
-                child.receiveShadow = true;
+            // Страна А
+            const sideA = gltf.scene.clone();
+            sideA.traverse((child) => {
+              if (child.isMesh && child.material) {
+                child.material = child.material.clone();
               }
             });
 
-            // Прилагаме мащаба
-            if (item.scale) {
-              windowModel.scale.set(item.scale.x, item.scale.y, item.scale.z);
+            // Страна Б
+            const sideB = gltf.scene.clone();
+            sideB.traverse((child) => {
+              if (child.isMesh && child.material) {
+                child.material = child.material.clone();
+              }
+            });
+
+            // Динамично изчисляване на мащаба като при вратите
+            if (item.dimensions) {
+              const box = new THREE.Box3().setFromObject(sideA);
+              const rawSize = new THREE.Vector3();
+              box.getSize(rawSize);
+
+              const scaleX = item.dimensions.width / rawSize.x;
+              const scaleY = item.dimensions.height / rawSize.y;
+              const targetDepth = item.dimensions.depth + 0.04;
+              const scaleZ = targetDepth / rawSize.z;
+
+              sideA.scale.set(scaleX, scaleY, scaleZ);
+              sideB.scale.set(scaleX, scaleY, scaleZ);
+
+              sideB.rotation.y = Math.PI;
+            } else if (item.scale) {
+              sideA.scale.set(item.scale.x, item.scale.y, item.scale.z);
+              sideB.scale.set(item.scale.x, item.scale.y, item.scale.z);
+              sideB.rotation.y = Math.PI;
             }
+
+            windowGroup.add(sideA);
+            windowGroup.add(sideB);
 
             if (item.texture) {
               if (item.texture.startsWith('#')) {
-                handleColorChange(windowModel, item.texture);
+                handleColorChange(sideA, item.texture);
+                handleColorChange(sideB, item.texture);
               }
               else {
-                await handleTextureChange(windowModel, item.texture);
+                await handleTextureChange(sideA, item.texture);
+                await handleTextureChange(sideB, item.texture);
               }
             }
 
-            windowGroup.add(windowModel);
-
-            // Позиция и ротация от базата данни
             windowGroup.position.set(item.position.x, item.position.y, item.position.z);
             windowGroup.rotation.set(item.rotation.x, item.rotation.y, item.rotation.z);
-
+  
             // Metadata на прозореца
             windowGroup.name = item.name;
             windowGroup.userData = {
               id: item.id,
               type: 'window',
               roomId: room.id || room._id,
-              wallId: item.wallId,        // ВАЖНО: За да се мести със стената!
+              wallId: item.wallId,   
+              dimensions: item.dimensions,   
               filename: item.filename,
               texture: item.texture ?? null
             };
-
-
             scene.add(windowGroup);
 
           } catch (err) {
@@ -381,8 +403,6 @@ export const loadRoomsGeometry = async (roomsData, scene) => {
           }
 
           const mesh = new THREE.Mesh(geometry, material);
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
           mesh.position.set(item.position.x, item.position.y, item.position.z);
           mesh.rotation.set(item.rotation.x, item.rotation.y, item.rotation.z);
           mesh.name = item.name;
@@ -410,27 +430,20 @@ export const loadRoomsGeometry = async (roomsData, scene) => {
 // Помощна функция за генериране на стена с дупки
 const buildWallGeometryWithHoles = (wallItem, allRoomItems, skipHoles = false) => {
   const { width, height, depth } = wallItem.dimensions;
-
-  // 1. Намираме всички прозорци и врати, закачени за тази стена
   const attachedHoles = skipHoles ? [] : allRoomItems.filter(
     item => item.type === 'window' && item.wallId === wallItem.id
   );
-
   // Ако няма дупки, връщаме стандартен BoxGeometry (по-бързо е)
   if (attachedHoles.length === 0) {
     return new THREE.BoxGeometry(width, height, depth);
   }
-
-  // 2. Има дупки! Чертаем 2D очертанието на стената
   const shape = new THREE.Shape();
-  // Чертаем от долния ляв ъгъл (0,0)
   shape.moveTo(0, 0);
   shape.lineTo(width, 0);
   shape.lineTo(width, height);
   shape.lineTo(0, height);
   shape.lineTo(0, 0);
 
-  // 3. Създаваме "виртуална" стена, за да превърнем глобалните 3D координати в локални 2D
   const dummyWall = new THREE.Object3D();
   dummyWall.position.set(wallItem.position.x, wallItem.position.y, wallItem.position.z);
   dummyWall.rotation.set(wallItem.rotation.x, wallItem.rotation.y, wallItem.rotation.z);
@@ -442,8 +455,6 @@ const buildWallGeometryWithHoles = (wallItem, allRoomItems, skipHoles = false) =
     const holeGlobalPos = new THREE.Vector3(holeItem.position.x, holeItem.position.y, holeItem.position.z);
     const localPos = dummyWall.worldToLocal(holeGlobalPos);
 
-    // Взимаме размерите на дупката (използваме scale, защото там пазиш размерите)
-    // Ако моделът ти по подразбиране не е 1x1x1, може да се наложи да добавим коефициент тук
     const holeW = holeItem.dimensions.width;
     const holeH = holeItem.dimensions.height;
 
@@ -477,32 +488,21 @@ const buildWallGeometryWithHoles = (wallItem, allRoomItems, skipHoles = false) =
 };
 
 export const redrawWallGeometry = (roomsData, scene, wallId, roomId, skipHoles = false) => {
-  // 1. Намираме данните за стаята и обектите в нея
-
   const room = roomsData.value.find(r => r.id === roomId || r._id === roomId || (r._id && r._id.$oid === roomId));
   if (!room || !room.wallsData) return;
-
   const allRoomItems = room.wallsData;
-
-  // 2. Намираме данните за самата стена
   const wallData = allRoomItems.find(item => item.id === wallId && item.type === 'wall');
   if (!wallData) return;
 
-  // 3. Търсим 3D обекта (Mesh) на стената в сцената
+  // Търсим 3D обекта на стената в сцената
   let wallMesh = null;
   scene.traverse(child => {
-    // Проверяваме дали обектът е стена и дали ID-то съвпада
     if (child.isMesh && child.userData && child.userData.id === wallId && child.userData.type === 'wall') {
       wallMesh = child;
     }
   });
-
   if (!wallMesh) return;
-  // 4. Генерираме новата геометрия с дупките
   const newGeometry = buildWallGeometryWithHoles(wallData, allRoomItems, skipHoles);
-
-  // 5. Подменяме геометрията!
-  // ВАЖНО: Винаги викаме dispose() на старата геометрия, за да не предизвикаме Memory Leak (изтичане на памет)
   if (wallMesh.geometry) {
     wallMesh.geometry.dispose();
   }

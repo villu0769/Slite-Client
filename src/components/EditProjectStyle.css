@@ -23,12 +23,14 @@ canvas{
   z-index: 1;
 }
 #bottom-menu p{
-  padding: 9px;
+  padding: 12px;
   font-weight: 900;
   color:var(--text);
   border: var(--border);
-  background-color: var(--bg-soft);
-  border-radius: 5px;
+  background: color-mix(in srgb, var(--bg), transparent 30%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 6px;
   margin:3px;
 }
 #bottom-menu p:hover{
@@ -228,6 +230,8 @@ canvas{
   font-size: 14px;
   color: var(--text);
   letter-spacing: 0.5px;
+  flex: 1; /* Позволява му да заеме само СВОБОДНОТО място */
+  min-width: 0; /* Предотвратява flex blowout, ако текстът е много дълъг */
 }
 
 /* --- Header Buttons (Back & Close) --- */

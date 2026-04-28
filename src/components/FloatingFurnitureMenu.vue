@@ -13,7 +13,7 @@
         <button v-if="selectedCategory" class="icon-btn back-btn" @click="goBack" title="Back">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
         </button>
-        <span>{{ selectedCategory ? currentCategoryLabel : 'Furniture Categories' }}</span>
+        <span>{{ selectedCategory ? currentCategoryLabel : 'Категории' }}</span>
       </div>
       <div class="header-actions">
         <button class="icon-btn close-btn" @click="emit('close')" aria-label="Close">
@@ -25,7 +25,6 @@
     <!-- Body with animated swap -->
     <div class="menu-body">
       <transition :name="transitionName" mode="out-in">
-        <!-- Categories -->
         <div v-if="!selectedCategory" key="categories" class="category-list">
           <button
             v-for="cat in categories"
@@ -38,10 +37,9 @@
           </button>
         </div>
 
-        <!-- Items -->
         <div v-else key="items" class="panel">
           <div class="items-header">
-            <span class="items-subtitle">Available in {{ currentCategoryLabel }}</span>
+            <span class="items-subtitle">{{ currentCategoryLabel }}</span>
           </div>
           <div class="item-buttons">
             <FurnitureButton
@@ -54,8 +52,7 @@
         </div>
       </transition>
     </div>
-
-    <!-- Resize handles -->
+    <!-- Дръжки за преоразмеряване на менюто -->
     <div class="resize-handle resize-right" @pointerdown.prevent="startResize($event,'right')" aria-hidden="true"></div>
     <div class="resize-handle resize-bottom" @pointerdown.prevent="startResize($event,'bottom')" aria-hidden="true"></div>
     <div class="resize-handle resize-corner" @pointerdown.prevent="startResize($event,'corner')" aria-hidden="true">
@@ -79,21 +76,17 @@ const props = defineProps({
 const emit = defineEmits(['close', 'start-drag']);
 const menuEl = ref(null);
 
-/* -------------------------
-   DATA (Async)
-------------------------- */
 const categories = ref([]); // Това вече идва от базата
 const isLoading = ref(false);
 
-// Зареждане при стартиране
 onMounted(async () => {
   window.addEventListener('resize', keepInViewport);
   try {
     isLoading.value = true;
     categories.value = await getFurnitureCategories();
-    categories.value = categories.value.filter(cat => !cat.non_furniture_type); // Филтрираме само с налични артикули
+    categories.value = categories.value.filter(cat => !cat.non_furniture_type); 
   } catch (error) {
-    console.error("Failed to load furniture categories:", error);
+    console.error("Грешка при зареждане на категория:", error);
   } finally {
     isLoading.value = false;
   }
@@ -224,6 +217,6 @@ onBeforeUnmount(() => {
 });
 </script>
 
-<style>
+<style scoped>
 @import './EditProjectStyle.css';
 </style>

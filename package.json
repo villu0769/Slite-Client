@@ -9,8 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "chart.js": "^4.5.1",
-    "konva": "^9.3.22",
     "lodash.debounce": "^4.0.8",
     "three": "^0.172.0",
     "uuid": "^13.0.0",

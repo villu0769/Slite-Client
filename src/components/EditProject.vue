@@ -1,24 +1,29 @@
 <template>
   <div id="edit-project-container">
-    <div id="undo-redo-container">
+    <!--<div id="undo-redo-container">
       <p @click="undo" :class="canUndo ? '' : 'unavailable'">&#8617;</p>
       <p @click="redo" :class="canRedo ? '' : 'unavailable'">&#8618;</p>
-    </div>
+    </div>-->
     <div v-if="isLoading || isSavingLayout || isModelLoading" class="loading-overlay">
       <div class="spinner"></div>
-      <p v-if="isSavingLayout">Saving...</p>
-      <p v-else>Loading...</p>
+      <p v-if="isSavingLayout">Запис...</p>
+      <p v-else>Зареждане...</p>
     </div>
     <div id="bottom-menu">
       <p @click="switchTo2D">2D</p>
       <p @click="switchTo3D">3D</p>
     </div>
-
-    <SelectionToolbar :visible="isToolbarVisible" :position="toolbarPosition" :objType="toolbarObjType"
+    <Notification 
+      :show="props.isMobileOrTablet" 
+      message="За да чертаете и редактирате проекти, моля, влезте през десктоп компютър." 
+      type="info" 
+    />
+    <SelectionToolbar v-if="!props.isMobileOrTablet" :visible="isToolbarVisible" :position="toolbarPosition" :objType="toolbarObjType"
       @duplicate="handleDuplicate" @rotate="handleToolbarRotate" @flip="handleFlip" @delete="handleDelete" />
 
-    <PropsMenu :visible="isPropsMenuVisible" :name="propsName" :details="propsDetails" :rotation="propsRotation"
-      :type="propsObjType" :texture="propsTexture" :ceiling="propsHasCeiling" @update:texture="useTextureManager"
+    <PropsMenu :visible="isPropsMenuVisible" :name="propsName" :rotation="propsRotation" :type="propsObjType"
+      :texture="propsTexture" :ceiling="propsHasCeiling" :width="propsWidth" :height="propsHeight" :depth="propsDepth"
+      @update:dimensions="handleDimensionsUpdate" @update:texture="useTextureManager"
       @update:rotation="handlePropsMenuRotation" @update:name="handlePropsMenuRename" @update:color="useTextureManager"
       @update:ceiling="handlePropsMenuCeiling" />
   </div>
@@ -40,6 +45,7 @@ import debounce from 'lodash.debounce';
 import { handleTextureChange, handleColorChange } from '../composables/textureManager.js';
 // Services & Components
 import { loadLayout, updateProjectLayout, addRoom, deleteRoom, updateRoom } from '../services/layoutService';
+import { uploadPreview } from '../services/projectsService';
 import { loadRoomsGeometry } from '../services/roomService';
 import { createRoomGeometry, createWallGeometry, redrawWallGeometry, createCeilingGeometry } from '../services/roomService'; // Импортираме service-a
 import SelectionToolbar from '../components/SelectionToolbar.vue';
@@ -51,6 +57,7 @@ import {
   fitOrthoCameraToBox
 } from '../composables/cameraFit.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import Notification from '../components/Notification.vue';
 
 const { theme } = useTheme();
 watch(theme, (t) => { scene.background = new THREE.Color(t === 'dark' ? 0x303541 : 0xb5bbcf); });
@@ -59,12 +66,15 @@ import {
   createResizeHandles,
   removeResizeHandles,
   updateHandlePositions
-} from './ResizeHandles.js'; // Adjust path as needed
+} from './ResizeHandles.js'; 
 import { initHistory, saveState, undo, redo, canUndo, canRedo } from '../composables/HistoryManager.js'; // Увери се, че пътя е верен
+import { useConfirm } from '../composables/useConfirm';
+const { showConfirm } = useConfirm();
 
 /* ------------Props & State----------- */
 const props = defineProps({
-  projectData: { type: Object, required: true }
+  projectData: { type: Object, required: true },
+  isMobileOrTablet: { type: Boolean, required: true }
 });
 
 const route = useRoute();
@@ -75,12 +85,14 @@ const roomsData = ref(Array.isArray(props.projectData.rooms) ? [...props.project
 // Toolbar State
 const isToolbarVisible = ref(false);
 const toolbarObjType = ref('');
-const toolbarPosition = reactive({ x: 0, y: 0,z:-1 });
+const toolbarPosition = reactive({ x: 0, y: 0, z: -1 });
 
 // Props Menu State
 const isPropsMenuVisible = ref(false);
 const propsName = ref('');
-const propsDetails = ref('');
+const propsWidth = ref(1);
+const propsHeight = ref(1);
+const propsDepth = ref(1);
 const propsRotation = ref(0);
 const propsObjType = ref('');
 const propsTexture = ref('');
@@ -134,18 +146,18 @@ controls.dampingFactor = 0.08;
 // Lights
 const hemiLight = new THREE.HemisphereLight(0xffffff, 0x888888, 0.7);
 scene.add(hemiLight);
-const ambientLight = new THREE.AmbientLight(0xffffff, 1.3); 
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
 scene.add(ambientLight);
 const dir = new THREE.DirectionalLight(0xffffff, 0.2);
-dir.position.set(8, 8, 17); 
+dir.position.set(20, 12, 17);
 
 dir.target.position.set(0, 0, 0);
-scene.add(dir.target); 
+scene.add(dir.target);
 
 dir.castShadow = true;
-dir.shadow.mapSize.width = 2048; 
+dir.shadow.mapSize.width = 2048;
 dir.shadow.mapSize.height = 2048;
-dir.shadow.bias = -0.0005; 
+dir.shadow.bias = -0.0005;
 dir.shadow.radius = 2.5;
 
 const d = 50; // Това означава 50 единици наляво, надясно, нагоре и надолу (общо 100х100)
@@ -158,7 +170,6 @@ dir.shadow.camera.far = 200; // Трябва да е достатъчно гол
 dir.shadow.camera.updateProjectionMatrix();
 scene.add(dir);
 
-
 // Grid
 const planeSize = 30;
 const maxHeight = 15;
@@ -170,7 +181,6 @@ grid.name = 'floor-grid';
 scene.add(grid);
 
 const manager = new THREE.LoadingManager();
-
 
 /* ---------------Post-Processing-------------- */
 const composer = new EffectComposer(renderer);
@@ -229,14 +239,15 @@ const getFormattedDate = () => {
   return `${year}-${month}-${day}_${hours}${minutes}`;
 };
 
-// Главната функция за реалистичен рендер
+
 const takeRealisticScreenshot = () => {
+  isLoading.value = true;
   // 1. ЗАПАЗВАМЕ ТЕКУЩИЯ РАБОТЕН РЕЖИМ
   const previousToneMapping = renderer.toneMapping;
   const previousExposure = renderer.toneMappingExposure;
   const previousBackground = scene.background; // Пазим оригиналния цвят
   const previousFog = scene.fog;
-  
+
   // Скриваме мрежата на пода (тъй като я имаш дефинирана като променлива 'grid')
   if (grid) grid.visible = false;
 
@@ -248,31 +259,31 @@ const takeRealisticScreenshot = () => {
   // 2. ВКЛЮЧВАМЕ ФОТОРЕАЛИСТИЧЕН РЕЖИМ
   // ACESFilmic e магията зад реалистичното преливане на светлината
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2; // Можеш да си поиграеш с тази стойност (напр. 1.0 или 1.5)
+  renderer.toneMappingExposure = 2; // Можеш да си поиграеш с тази стойност (напр. 1.0 или 1.5)
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  ambientLight.intensity=0.3;
-  hemiLight.intensity=0.3;
-  dir.intensity=1.1;
-  
+  ambientLight.intensity = 0;
+  hemiLight.intensity = 0;
+  dir.intensity = 1.4;
+
   dir.castShadow = true;
-dir.shadow.mapSize.width = 2048; 
-dir.shadow.mapSize.height = 2048;
-dir.shadow.camera.near = 0.5;
-dir.shadow.camera.far = 50;
+  dir.shadow.mapSize.width = 2048;
+  dir.shadow.mapSize.height = 2048;
+  dir.shadow.camera.near = 0.5;
+  dir.shadow.camera.far = 50;
 
-const d = 25; 
-dir.shadow.camera.left = -d;
-dir.shadow.camera.right = d;
-dir.shadow.camera.top = d;
-dir.shadow.camera.bottom = -d;
+  const d = 25;
+  dir.shadow.camera.left = -d;
+  dir.shadow.camera.right = d;
+  dir.shadow.camera.top = d;
+  dir.shadow.camera.bottom = -d;
 
-dir.shadow.bias = -0.0005; 
-dir.shadow.radius = 3;
-  const skyColor = new THREE.Color(0x9fbac4); 
+  dir.shadow.bias = -0.0005;
+  dir.shadow.radius = 3;
+  const skyColor = new THREE.Color(0x9fbac4);
   scene.background = skyColor;
-  
-  scene.fog = new THREE.Fog(skyColor, 0, 90);; 
+
+  scene.fog = new THREE.Fog(skyColor, -50, 250);;
 
   // Увеличаваме зрението на камерата
   const oldFar = activeCamera.far;
@@ -281,35 +292,42 @@ dir.shadow.radius = 3;
 
   if (!outdoorGround) {
     outdoorGround = new THREE.Mesh(
-      new THREE.PlaneGeometry(1000, 1000), 
-      new THREE.MeshStandardMaterial({ 
+      new THREE.PlaneGeometry(1000, 1000),
+      new THREE.MeshStandardMaterial({
         color: 0x828c8c,
-        roughness: 1,    
+        roughness: 1,
         metalness: 0,
-        side: THREE.DoubleSide 
+        side: THREE.DoubleSide
       })
     );
     outdoorGround.rotation.x = -Math.PI / 2;
-    outdoorGround.position.y = 0.05; 
-    outdoorGround.receiveShadow = true; 
+    outdoorGround.position.y = 0.05;
+    outdoorGround.receiveShadow = true;
   }
-  
+
   // ЕТО ТОВА ЛИПСВАШЕ: Слагаме земята в сцената!
   scene.add(outdoorGround);
-
-  // ВАЖНО: Рендерираме директно през renderer...
+  scene.traverse((child) => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+    // КАЗВАМЕ НА МАТЕРИАЛА ДА СЕ ПРЕКОМПИЛИРА С НОВИЯ TONE MAPPING
+    if (child.material) {
+      if (Array.isArray(child.material)) {
+        child.material.forEach(m => m.needsUpdate = true);
+      } else {
+        child.material.needsUpdate = true;
+      }
+    }
+  });
+  renderer.antialias = true;
   renderer.render(scene, activeCamera);
-
   // 3. ПРАВИМ СНИМКАТА
+  let dataUrl = null;
   try {
-    const dataUrl = renderer.domElement.toDataURL("image/png");
-    
-    const link = document.createElement('a');
-    link.href = dataUrl;
-    link.download = `рендер_${getFormattedDate()}.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Само генерираме картинката, БЕЗ да я теглим
+    dataUrl = renderer.domElement.toDataURL("image/png");
   } catch (error) {
     console.error("Грешка при създаване на рендер:", error);
   }
@@ -320,7 +338,7 @@ dir.shadow.radius = 3;
   renderer.shadowMap.enabled = false;
   dir.intensity = 0.2;
   hemiLight.intensity = 0.7;
-  ambientLight.intensity = 1.3;
+  ambientLight.intensity = 1.5;
 
   dir.castShadow = false;
   if (grid) grid.visible = true;
@@ -329,13 +347,25 @@ dir.shadow.radius = 3;
   scene.remove(outdoorGround);
   scene.background = previousBackground;
   scene.fog = previousFog;
-
+  scene.traverse((child) => {
+    if (child.isMesh) {
+      if (child.material) {
+        if (Array.isArray(child.material)) {
+          child.material.forEach(m => m.needsUpdate = true);
+        } else {
+          child.material.needsUpdate = true;
+        }
+      }
+    }
+  });
   // ВРЪЩАМЕ ЗРЕНИЕТО НА КАМЕРАТА! (Това също липсваше накрая)
   activeCamera.far = oldFar;
   activeCamera.updateProjectionMatrix();
-
+  renderer.antialias = false;
   // Рендерираме отново през composer
   composer.render();
+  isLoading.value = false;
+  return dataUrl;
 };
 
 async function performRebuild() {
@@ -395,6 +425,7 @@ async function useTextureManager(filename) {
       const room = roomsData.value.find(r => r._id === roomId || r.id === roomId);
       if (room) {
         updateRoomDebounced(projectId, roomId, room.wallsData);
+        uploadPreviewDebounced();
       }
     }
     else {
@@ -422,8 +453,6 @@ async function createRoom(width, length, height, thickness) {
     });
 
     roomsData.value.push(roomEntry);
-    saveState();
-    // Запазваме в историята след създаване на стая
 
   } catch (error) {
     console.error("Failed to create room:", error);
@@ -448,8 +477,6 @@ async function createWall(length, height, thickness) {
     });
 
     roomsData.value.push(roomEntry);
-    saveState();
-    // Запазваме в историята след създаване на стена
   } catch (error) {
     console.error("Failed to create room:", error);
     alert("Could not save room to database.");
@@ -540,7 +567,7 @@ function constrainPositionToFloors(targetPos, object) {
 }
 const WALL_SNAP_DISTANCE = 1.5; // Meters/Units distance to trigger snap
 
-function findWallSnap(position, objectToSnap) { 
+function findWallSnap(position, objectToSnap) {
   let closestDist = Infinity;
   let bestSnap = null;
 
@@ -548,7 +575,7 @@ function findWallSnap(position, objectToSnap) {
   // Ползваме Box3, за да работи перфектно дори за сложни GLTF модели
   const objBox = new THREE.Box3().setFromObject(objectToSnap);
   // Взимаме реалната ширина на прозореца
-  const objWidth = objBox.max.x - objBox.min.x; 
+  const objWidth = objBox.max.x - objBox.min.x;
   const halfObjWidth = objWidth / 2;
 
   // Find all walls in the scene
@@ -634,6 +661,7 @@ function firstIntersectableObjectFromPointer(clientX, clientY) {
 function onPointerDownForDrag(e) {
   // Проверка за бутона на мишката (само ляв бутон)
   if (e.button !== undefined && e.button !== 0) return;
+  if (props.isMobileOrTablet) return;
 
   const rect = renderer.domElement.getBoundingClientRect();
   const ndc = {
@@ -748,7 +776,7 @@ function onPointerDownForDrag(e) {
     dragObject = root;
   }
   else if (root.userData && root.userData.type === 'wall') {
-    if (!selectedObjects.includes(root)) {
+    if (selectedObjects[0] !== root) {
       selectedObjects.length = 0;
       selectedObjects.push(root);
 
@@ -766,7 +794,7 @@ function onPointerDownForDrag(e) {
   }
   else {
     // Multi-selection logic: запазваме групата, ако кликнем върху вече селектиран
-    if (!selectedObjects.includes(root)) {
+    if (selectedObjects[0] !== root) {
       selectedObjects.length = 0;
       selectedObjects.push(root);
     }
@@ -818,6 +846,7 @@ const isDoorOrWindow = (obj) => {
   return obj.userData.type === 'door' || obj.userData.type === 'window';
 };
 function onPointerMoveForDrag(e) {
+  if (props.isMobileOrTablet) return;
   const rect = renderer.domElement.getBoundingClientRect();
   const ndc = {
     x: ((e.clientX - rect.left) / rect.width) * 2 - 1,
@@ -902,23 +931,96 @@ function onPointerMoveForDrag(e) {
   // =========================================================
   if (!dragging || !dragObject) return;
 
-  const intersectionPoint = new THREE.Vector3();
-  if (!raycaster.ray.intersectPlane(dragPlane, intersectionPoint)) return;
-
   // 1. Запазваме стара позиция (локална, за групата)
   const oldPos = dragObject.position.clone();
+  let targetWorld = new THREE.Vector3();
 
-  // 2. Смятаме желаната световна позиция
-  let targetWorld = intersectionPoint.clone().add(dragOffset);
+  // 3. ТЪРСИМ ОБЕКТ ПОД МИШКАТА (SURFACE SNAPPING)
+  const isFurniture = !['wall', 'door', 'window', 'floor','ceiling'].includes(dragObject.userData.type);
 
-  // 3. Търсим пода или запазваме Y
-  const isFurniture = !['wall', 'door', 'window', 'floor'].includes(dragObject.userData.type);
-  if (isFurniture || dragObject.userData.type === 'wall') {
-    targetWorld.y = getFloorLevelAt(targetWorld.x, targetWorld.z, dragObject);
+  if (isFurniture) {
+    // 3.1. Събираме всички обекти, които могат да бъдат "повърхност"
+    const surfaces = [];
+    scene.traverse(child => {
+      // Игнорираме обекта, който влачим (и неговите деца)
+      let isSelf = false;
+      child.traverseAncestors(ancestor => {
+        if (ancestor === dragObject) isSelf = true;
+      });
+      if (child === dragObject) isSelf = true;
+
+      // Взимаме само реални 3D обекти (Mesh), игнорираме тавани, врати и прозорци
+      if (!isSelf && child.isMesh) {
+        const type = child.userData?.type || child.parent?.userData?.type;
+        if (type !== 'ceiling' && type !== 'door' && type !== 'window') {
+          surfaces.push(child);
+        }
+      }
+    });
+
+    // 3.2. Стреляме с лъча директно от мишката
+    const intersects = raycaster.intersectObjects(surfaces, false);
+
+    if (intersects.length > 0) {
+      const hit = intersects[0];
+      const hitType = hit.object.userData?.type || hit.object.parent?.userData?.type;
+
+      // Изчисляваме отместването на обекта (за да не потъва центърът му в пода/стената)
+      const box = new THREE.Box3().setFromObject(dragObject);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const bottomOffset = dragObject.position.y - box.min.y;
+
+      if (hitType === 'wall') {
+        // --- ЗАЛЕПВАНЕ ЗА СТЕНА ---
+        targetWorld.copy(hit.point);
+
+        // Взимаме нормалата на лицето на стената (накъде сочи)
+        const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
+        
+        // Избутваме обекта напред, за да не потъне в стената (предполагаме, че pivot e в центъра)
+        targetWorld.add(normal.multiplyScalar(size.z / 2));
+
+        // Ограничаваме го да не слиза под нивото на пода, докато е на стената
+        const floorY = getFloorLevelAt(targetWorld.x, targetWorld.z, dragObject);
+        if (targetWorld.y - bottomOffset < floorY) {
+          targetWorld.y = floorY + bottomOffset;
+        }
+
+      } else {
+        // --- СТЪПВАНЕ ВЪРХУ ПОД ИЛИ ДРУГА МЕБЕЛ ---
+        targetWorld.x = hit.point.x;
+        targetWorld.z = hit.point.z;
+        targetWorld.y = hit.point.y + bottomOffset; // Стъпва точно върху ударената точка
+      }
+    } else {
+      // 3.3. FALLBACK: Ако мишката сочи в нищото, движим по старата dragPlane равнина
+      const planeHit = new THREE.Vector3();
+      if (raycaster.ray.intersectPlane(dragPlane, planeHit)) {
+        targetWorld.copy(planeHit).add(dragOffset);
+        targetWorld.y = getFloorLevelAt(targetWorld.x, targetWorld.z, dragObject);
+      } else {
+        return; // Няма накъде да се мести
+      }
+    }
+
   } else {
-    const currentWorldPos = new THREE.Vector3();
-    dragObject.getWorldPosition(currentWorldPos);
-    targetWorld.y = currentWorldPos.y;
+    // =========================================================
+    // ЛОГИКА ЗА АРХИТЕКТУРА (Врати, прозорци, стени) - БЕЗ ПРОМЯНА
+    // =========================================================
+    const intersectionPoint = new THREE.Vector3();
+    if (!raycaster.ray.intersectPlane(dragPlane, intersectionPoint)) return;
+
+    targetWorld = intersectionPoint.clone().add(dragOffset);
+
+    if (dragObject.userData.type === 'wall') {
+      targetWorld.y = getFloorLevelAt(targetWorld.x, targetWorld.z, dragObject);
+    } else {
+      // За врати/прозорци запазваме текущата им височина (Y)
+      const currentWorldPos = new THREE.Vector3();
+      dragObject.getWorldPosition(currentWorldPos);
+      targetWorld.y = currentWorldPos.y;
+    }
   }
 
   // 4. Grid Snap
@@ -926,16 +1028,18 @@ function onPointerMoveForDrag(e) {
     const snapped = snapVec(targetWorld, GRID_SNAP.size);
     const keepY = targetWorld.y;
     targetWorld.copy(snapped);
-    targetWorld.y = keepY;
+    targetWorld.y = keepY; // Пазим Y, за да не "потъне" при snap към грида
   }
 
   // 5. Логика спрямо типа обект
-  if (!isDoorOrWindow(dragObject)) {
+  if (dragObject.userData.type === 'ceiling') {
+    // ТАВАН: Не проверяваме за колизии, за да може да минава свободно НАД стените
+  } else if (!isDoorOrWindow(dragObject)) {
     // Мебели
     targetWorld = getSafePosition(targetWorld, dragObject);
   } else {
     // ВРАТИ И ПРОЗОРЦИ
-    const snap = findWallSnap(targetWorld,dragObject);
+    const snap = findWallSnap(targetWorld, dragObject);
 
     if (snap) {
       const prevLocalPos = dragObject.position.clone();
@@ -1019,9 +1123,10 @@ function onPointerMoveForDrag(e) {
   if (typeof updateHandlePositions === 'function') {
     updateHandlePositions(dragObject);
   }
-
   e.preventDefault();
-} function getFloorLevelAt(x, z, object) {
+}
+
+function getFloorLevelAt(x, z, object) {
   // 1. Пускаме лъч отвисоко надолу на координати X, Z
   const raycasterDown = new THREE.Raycaster();
   raycasterDown.set(new THREE.Vector3(x, 50, z), new THREE.Vector3(0, -1, 0));
@@ -1054,9 +1159,10 @@ async function onPointerUpForDrag(e) {
   // =========================================================
   // PHASE 1: FINALIZE RESIZE
   // =========================================================
+  if(props.isMobileOrTablet) return;
   if (isResizing && selectedObjects[0]) {
     const targetObj = selectedObjects[0];
-    const type = targetObj.userData.type; 
+    const type = targetObj.userData.type;
 
     controls.enabled = true;
     isResizing = false;
@@ -1085,7 +1191,7 @@ async function onPointerUpForDrag(e) {
       // --- Ъпдейтваме данните в глобалния масив (Базата данни) ---
       const roomId = targetObj.userData.roomId;
       const room = roomsData.value.find(r => r.id === roomId || r._id === roomId || (r._id && r._id.$oid === roomId));
-      
+
       if (room && room.wallsData) {
         // А) Обновяваме стената
         const dbWall = room.wallsData.find(w => w.id === targetObj.userData.id);
@@ -1101,7 +1207,7 @@ async function onPointerUpForDrag(e) {
 
         scene.traverse((child) => {
           if ((child.userData.type === 'window' || child.userData.type === 'door') && child.userData.wallId === targetObj.userData.id) {
-            
+
             // 1. Взимаме ширината на прозореца/вратата
             let childWidth = 0;
             if (child.userData.dimensions && child.userData.dimensions.width) {
@@ -1144,11 +1250,11 @@ async function onPointerUpForDrag(e) {
       setTimeout(() => {
         // Сега redrawWallGeometry ще прочете НОВАТА ширина на стената и НОВИТЕ (коригирани) позиции на прозорците!
         redrawWallGeometry(roomsData, scene, targetObj.userData.id, targetObj.userData.roomId);
-        
+
         scene.traverse((child) => {
-            if ((child.userData.type === 'window' || child.userData.type === 'door') && child.userData.wallId === targetObj.userData.id) {
-              child.visible = true; // Показваме ги отново, вече на правилното място
-            }
+          if ((child.userData.type === 'window' || child.userData.type === 'door') && child.userData.wallId === targetObj.userData.id) {
+            child.visible = true; // Показваме ги отново, вече на правилното място
+          }
         });
         createResizeHandles(targetObj, scene);
       }, 10);
@@ -1204,11 +1310,9 @@ async function onPointerUpForDrag(e) {
     const room = roomsData.value.find(r => r._id === roomId || r.id === roomId);
 
     if (room) {
-      // ВАЖНО: Тук подаваш room.wallsData. 
       await updateRoom(projectId, roomId, room.wallsData);
+      uploadPreviewDebounced(projectId);
     }
-
-    saveState();
 
     return;
   }
@@ -1259,6 +1363,7 @@ async function onPointerUpForDrag(e) {
           const oldRoom = roomsData.value.find(r => r._id === originalRoomId || r.id === originalRoomId);
           if (oldRoom) {
             await updateRoom(projectId, originalRoomId, oldRoom.wallsData);
+            uploadPreviewDebounced(projectId);
           }
         }
 
@@ -1266,6 +1371,7 @@ async function onPointerUpForDrag(e) {
         const currentRoom = roomsData.value.find(r => r._id === currentRoomId || r.id === currentRoomId);
         if (currentRoom) {
           await updateRoom(projectId, currentRoomId, currentRoom.wallsData);
+          uploadPreviewDebounced(projectId);
         }
       } catch (error) {
         console.error("Грешка при запазване на стаята:", error);
@@ -1281,7 +1387,6 @@ async function onPointerUpForDrag(e) {
       saveLayoutDebounced();
     }
   }
-  saveState();
 }
 async function handlePropsMenuRename(newName) {
   const obj = selectedObjects[0];
@@ -1299,13 +1404,109 @@ async function handlePropsMenuRename(newName) {
     const room = roomsData.value.find(r => r._id === roomId || r.id === roomId);
     if (room) {
       await updateRoom(projectId, roomId, room.wallsData);
+      uploadPreviewDebounced(projectId);
     }
   } else {
     updateLayoutEntryFromObject(obj);
     saveLayoutDebounced();
   }
-  saveState(); // Запазваме в историята след преименуване
 }
+
+async function handleDimensionsUpdate(newDims) {
+  const obj = selectedObjects[0];
+  if (!obj) return;
+
+  const type = obj.userData.type;
+
+  // 1. Взимаме чистите размери (без ротация)
+  const oldRotation = obj.rotation.clone();
+  obj.rotation.set(0, 0, 0);
+  obj.updateMatrixWorld(true);
+
+  const box = new THREE.Box3().setFromObject(obj);
+  const currentSize = new THREE.Vector3();
+  box.getSize(currentSize);
+
+  // Връщаме ротацията
+  obj.rotation.copy(oldRotation);
+  obj.updateMatrixWorld(true);
+
+  if (currentSize.x === 0 || currentSize.y === 0 || currentSize.z === 0) return;
+
+  // 2. Изчисляваме новия мащаб
+  const scaleX = (newDims.width / currentSize.x) * obj.scale.x;
+  const scaleY = (newDims.height / currentSize.y) * obj.scale.y;
+  const scaleZ = (newDims.depth / currentSize.z) * obj.scale.z;
+
+  // 3. Прилагаме новия мащаб
+  obj.scale.set(scaleX, scaleY, scaleZ);
+  obj.updateMatrixWorld(true);
+
+  // =========================================================
+  // 4. ОБРАБОТКА СПОРЕД ТИПА НА ОБЕКТА
+  // =========================================================
+
+  if (type === 'wall' || type === 'floor') {
+    isResizing = true;
+    await onPointerUpForDrag({});
+  } else {
+    // ЗА ПРОЗОРЦИ, ВРАТИ И МЕБЕЛИ:
+    // Обновяваме данните в обекта
+    if (!obj.userData.dimensions) obj.userData.dimensions = {};
+    obj.userData.dimensions.width = newDims.width;
+    obj.userData.dimensions.height = newDims.height;
+    obj.userData.dimensions.depth = newDims.depth;
+
+    // Запазване в базата
+    if (isRoomObject(obj)) {
+      updateRoomEntryFromObject(obj);
+      const roomId = obj.userData.roomId;
+      const room = roomsData.value.find(r => r._id === roomId || r.id === roomId);
+      if (room && room.wallsData) {
+        await updateRoom(projectId, roomId, room.wallsData);
+        if (type === 'window' && obj.userData.wallId) {
+          redrawWallGeometry(roomsData, scene, obj.userData.wallId, obj.userData.roomId);
+        }
+        uploadPreviewDebounced(projectId);
+      }
+    } else {
+      // Ако е свободна мебел (извън стая)
+      updateLayoutEntryFromObject(obj);
+      saveLayoutDebounced();
+    }
+  }
+  // 5. Обновяваме UI-а (за да се позиционира менюто правилно след промяната на размера)
+  updateSelectionUI(obj);
+}
+
+const useUploadPreview = async () => {
+  if (!projectId) {
+    console.error('Липсва projectId за качване на preview.');
+    return;
+  }
+
+  // 1. Скриваме мрежата и хендълите (както при обикновения скрийншот)
+  if (grid) grid.visible = false;
+  if (typeof selectedObjects !== 'undefined' && selectedObjects.length > 0 && typeof removeResizeHandles === 'function') {
+    removeResizeHandles();
+  }
+
+  // ВАЖНО: Задължително рендерираме сцената ръчно тук.
+  // Това гарантира, че canvas-ът се опреснява БЕЗ мрежата, преди да го снимаме.
+  renderer.render(scene, activeCamera);
+
+  // 2. Взимаме снимката като DataURL (ползваме JPEG, за да е по-малък файлът)
+  const dataUrl = renderer.domElement.toDataURL("image/jpeg", 0.8);
+
+  if (grid) grid.visible = true;
+  renderer.render(scene, activeCamera);
+  const base64Response = await fetch(dataUrl);
+  const blob = await base64Response.blob();
+  await uploadPreview(projectId, blob);
+};
+
+const uploadPreviewDebounced = debounce(useUploadPreview, 60000);
+
 async function handlePropsMenuCeiling(wantsCeiling) {
   const floor = selectedObjects.find(o => o.userData.type === 'floor');
   if (!floor || floor.userData.type !== 'floor') return;
@@ -1331,7 +1532,7 @@ async function handlePropsMenuCeiling(wantsCeiling) {
         const width = floor.userData.dimensions.width * Math.abs(floor.scale.x || 1);
         const depth = (floor.userData.dimensions.depth || floor.userData.dimensions.height) * Math.abs(floor.scale.z || 1);
 
-        let maxWallY = 2.8; 
+        let maxWallY = 2.8;
         scene.traverse((child) => {
           if (child.userData.type === 'wall' && child.userData.roomId === roomId) {
             const box = new THREE.Box3().setFromObject(child);
@@ -1370,7 +1571,7 @@ async function handlePropsMenuCeiling(wantsCeiling) {
       if (ceilingMesh) {
         scene.remove(ceilingMesh);
         if (ceilingMesh.geometry) ceilingMesh.geometry.dispose();
-        
+
         // Почистваме и материалите за избягване на memory leaks
         if (ceilingMesh.material) {
           if (Array.isArray(ceilingMesh.material)) {
@@ -1383,13 +1584,13 @@ async function handlePropsMenuCeiling(wantsCeiling) {
     }
     // Запазваме промените
     await updateRoom(projectId, roomId, room.wallsData, room.hasCeiling);
-    saveState();
+    uploadPreviewDebounced(projectId);
 
   } catch (error) {
     console.error("Failed to toggle ceiling:", error);
     alert("Could not update ceiling in database.");
   } finally {
-    propsHasCeiling.value = wantsCeiling; 
+    propsHasCeiling.value = wantsCeiling;
     isLoading.value = false;
   }
 }
@@ -1486,7 +1687,7 @@ const _normal = new THREE.Vector2(); // Създаваме го само вед�
 
 function doPolygonsIntersect(polyA, polyB) {
   const polygons = [polyA, polyB];
-  
+
   for (let i = 0; i < polygons.length; i++) {
     const polygon = polygons[i];
     for (let i1 = 0; i1 < polygon.length; i1++) {
@@ -1512,7 +1713,7 @@ function doPolygonsIntersect(polyA, polyB) {
       }
 
       if (maxA <= minB || maxB <= minA) {
-        return false; 
+        return false;
       }
     }
   }
@@ -1520,16 +1721,16 @@ function doPolygonsIntersect(polyA, polyB) {
 }
 function getSafePosition(proposedWorldPos, objectToMove) {
   const allWalls = scene.children.filter(o =>
-    (o.userData.type === 'wall' && o !== objectToMove && 
+  (o.userData.type === 'wall' && o !== objectToMove &&
     ((objectToMove.userData.type === 'floor' && o.userData.roomId !== objectToMove.userData.roomId) || objectToMove.userData.type !== 'floor'))
   );
 
   const currentPos = objectToMove.position.clone();
 
   // Бърз филтър (Broadphase) - взимаме само близките стени
-  const MAX_DISTANCE = 5; 
-  const nearbyWalls = allWalls.filter(wall => 
-    wall.position.distanceTo(proposedWorldPos) < MAX_DISTANCE || 
+  const MAX_DISTANCE = 5;
+  const nearbyWalls = allWalls.filter(wall =>
+    wall.position.distanceTo(proposedWorldPos) < MAX_DISTANCE ||
     wall.position.distanceTo(currentPos) < MAX_DISTANCE
   );
 
@@ -1549,16 +1750,16 @@ function getSafePosition(proposedWorldPos, objectToMove) {
   if (isCurrentlyStuck) {
     // Обектът е заклещен. Проверяваме дали предложената позиция го изкарва.
     const isProposedStuck = checkCollisionAt(proposedWorldPos, objectToMove, cachedWalls);
-    
+
     // Ако новата позиция е чиста, пускаме го веднага да излезе!
     if (!isProposedStuck) return proposedWorldPos;
-    
+
     // Ако и на новата позиция е в сблъсък, трябва да проверим дали 
     // поне се движи НАВЪН (отдалечава се от центъра на стената).
     // За по-просто: пускаме го да се движи свободно, докато излезе, 
     // но само към позицията на мишката (proposedWorldPos).
-    return proposedWorldPos; 
-    
+    return proposedWorldPos;
+
     /* Забележка: Връщаме proposedWorldPos директно тук, за да дадем пълна 
        свобода на потребителя да "издърпа" стената. Щом излезе от другата стена, 
        при следващото движение isCurrentlyStuck ще бъде false и нормалната 
@@ -1570,19 +1771,19 @@ function getSafePosition(proposedWorldPos, objectToMove) {
   // ========================================================
   const movement = new THREE.Vector3().subVectors(proposedWorldPos, currentPos);
   const distance = movement.length();
-  
+
   if (distance < 0.001) return proposedWorldPos;
 
-  const stepSize = 0.1; 
+  const stepSize = 0.1;
   const steps = Math.max(1, Math.ceil(distance / stepSize));
-  
+
   let safePos = currentPos.clone();
 
   // Стъпково движение
   for (let i = 1; i <= steps; i++) {
     const stepFraction = i / steps;
     const testPos = currentPos.clone().add(movement.clone().multiplyScalar(stepFraction));
-    
+
     if (!checkCollisionAt(testPos, objectToMove, cachedWalls)) {
       safePos.copy(testPos); // Стъпката е успешна
     } else {
@@ -1590,7 +1791,7 @@ function getSafePosition(proposedWorldPos, objectToMove) {
       let minPos = safePos.clone();
       let maxPos = testPos.clone();
       let midPos = new THREE.Vector3();
-      
+
       for (let b = 0; b < 5; b++) {
         midPos.lerpVectors(minPos, maxPos, 0.5);
         if (checkCollisionAt(midPos, objectToMove, cachedWalls)) {
@@ -1599,7 +1800,7 @@ function getSafePosition(proposedWorldPos, objectToMove) {
           minPos.copy(midPos); // Чисто е
         }
       }
-      safePos.copy(minPos); 
+      safePos.copy(minPos);
 
       // ТАЙНАТА НА ПЛЪЗГАНЕТО (SLIDING)
       let moved = false;
@@ -1612,7 +1813,7 @@ function getSafePosition(proposedWorldPos, objectToMove) {
         safePos.copy(testPosX);
         moved = true;
       }
-      
+
       const testPosZ = safePos.clone();
       testPosZ.z += stepZ;
       if (!checkCollisionAt(testPosZ, objectToMove, cachedWalls)) {
@@ -1620,7 +1821,7 @@ function getSafePosition(proposedWorldPos, objectToMove) {
         moved = true;
       }
 
-      if (!moved) break; 
+      if (!moved) break;
     }
   }
 
@@ -1651,6 +1852,7 @@ function makeFinalMaterials(node) {
 
 async function startDragFromMenu(item) {
   if (!item) return;
+  if (props.isMobileOrTablet) return;
   cancelMenuDragIfAny();
   draggingFromMenu = true;
   draggedItem = item;
@@ -1694,7 +1896,10 @@ function onMenuDragMove(e) {
   if (!draggingFromMenu) return;
   e.preventDefault();
   const rect = renderer.domElement.getBoundingClientRect();
-  const ndc = { x: ((e.clientX - rect.left) / rect.width) * 2 - 1, y: -((e.clientY - rect.top) / rect.height) * 2 + 1 };
+  const ndc = { 
+    x: ((e.clientX - rect.left) / rect.width) * 2 - 1,
+    y: -((e.clientY - rect.top) / rect.height) * 2 + 1 
+  };
   raycaster.setFromCamera(ndc, activeCamera);
 
   if (!raycaster.ray.intersectPlane(dragPlane, intersectionPoint)) {
@@ -1773,7 +1978,6 @@ function finalizeDropAt(posWorld) {
   draggingFromMenu = false;
 
   if (controls) controls.enabled = true;
-  saveState();
 }
 
 /* -------------------------
@@ -1829,7 +2033,8 @@ function updateRoomEntryFromObject(obj) {
   // =========================================================
   dataEntry.position = { x: obj.position.x, y: obj.position.y, z: obj.position.z };
   dataEntry.rotation = { x: obj.rotation.x, y: obj.rotation.y, z: obj.rotation.z };
-
+  dataEntry.scale = { x: obj.scale.x, y: obj.scale.y, z: obj.scale.z };
+  dataEntry.dimensions = obj.userData.dimensions || dataEntry.dimensions || { width: 1, height: 1, depth: 1 };
   if (obj.name) dataEntry.name = obj.name;
   if (obj.userData.texture) dataEntry.texture = obj.userData.texture;
 
@@ -1851,6 +2056,7 @@ function addToLayoutData(object3D) {
   object3D.userData.id = entry.id;
   layoutData.value.push(entry);
   saveLayoutDebounced();
+  uploadPreviewDebounced();
 }
 
 function updateLayoutEntryFromObject(object3D) {
@@ -1868,6 +2074,7 @@ async function saveLayout() {
   try {
     isSavingLayout.value = true;
     await updateProjectLayout(projectId, layoutData.value);
+    uploadPreviewDebounced();
   } catch (err) {
     console.error('Failed to save layout', err);
   } finally {
@@ -1883,7 +2090,7 @@ function updateSelectionUI(obj) {
     clearSelection();
     return;
   }
-  
+
   const box = new THREE.Box3().setFromObject(obj);
   const halfWidth = window.innerWidth / 2;
   const halfHeight = window.innerHeight / 2;
@@ -1908,18 +2115,18 @@ function updateSelectionUI(obj) {
   for (let i = 0; i < corners.length; i++) {
     corners[i].project(activeCamera);
     const screenY = -(corners[i].y * halfHeight) + halfHeight;
-    
+
     if (screenY < highestScreenY) {
       highestScreenY = screenY;
     }
   }
 
-  toolbarPosition.y = highestScreenY - 30; 
-  
+  toolbarPosition.y = highestScreenY - 30;
+
   // ==========================================
   // ОСТАНАЛАТА ЧАСТ ОТ КОДА (без промяна)
   // ==========================================
-  
+
   toolbarObjType.value = obj.userData.type || 'unknown';
   isToolbarVisible.value = true;
 
@@ -1929,21 +2136,36 @@ function updateSelectionUI(obj) {
     removeResizeHandles();
   }
 
-  const size = new THREE.Vector3();
-  box.getSize(size);
+  const oldRot = obj.rotation.clone();
+  obj.rotation.set(0, 0, 0);
+  obj.updateMatrixWorld(true);
+
+  const localBox = new THREE.Box3().setFromObject(obj);
+  const trueSize = new THREE.Vector3();
+  localBox.getSize(trueSize);
+
+  // Връщаме ротацията веднага
+  obj.rotation.copy(oldRot);
+  obj.updateMatrixWorld(true);
+  // ---------------------------------------------------------
+
   isPropsMenuVisible.value = true;
   propsName.value = obj.name || 'Unknown Object';
   propsObjType.value = obj.userData.type || 'unknown';
   propsTexture.value = obj.userData.texture;
-  
+
   if (obj.userData.type === 'floor') {
     const room = roomsData.value.find(r => r._id === obj.userData.roomId || r.id === obj.userData.roomId);
     propsHasCeiling.value = room ? room.hasCeiling == 1 : false;
   } else {
     propsHasCeiling.value = false;
   }
-  
-  propsDetails.value = `w:${size.x.toFixed(2)} h:${size.y.toFixed(2)} d:${size.z.toFixed(2)}`;
+
+  // Подаваме истинските размери към менюто
+  propsWidth.value = Number(trueSize.x.toFixed(3));
+  propsHeight.value = Number(trueSize.y.toFixed(3));
+  propsDepth.value = Number(trueSize.z.toFixed(3));
+
   const degrees = Math.round((obj.rotation.y * 180 / Math.PI));
   propsRotation.value = degrees;
 }
@@ -1997,6 +2219,7 @@ async function handlePropsMenuRotation(newDegrees) {
       const room = roomsData.value.find(r => r._id === roomId || r.id === roomId);
       if (room) {
         await updateRoom(projectId, roomId, room.wallsData);
+        uploadPreviewDebounced();
       }
     }
 
@@ -2015,7 +2238,10 @@ async function handlePropsMenuRotation(newDegrees) {
       updateRoomEntryFromObject(obj);
       const roomId = obj.userData.roomId;
       const room = roomsData.value.find(r => r._id === roomId || r.id === roomId);
-      if (room) await updateRoom(projectId, roomId, room.wallsData);
+      if (room) {
+        await updateRoom(projectId, roomId, room.wallsData);
+        uploadPreviewDebounced(projectId);
+      }
     } else {
       updateLayoutEntryFromObject(obj);
       saveLayoutDebounced();
@@ -2034,10 +2260,33 @@ function handleDuplicate() {
   clone.position.z += 2;
   clone.userData.id = uuidv4();
   clone.userData.filename = original.userData.filename;
-  const constrained = constrainPositionToFloors(clone.position, clone);
-  clone.position.copy(constrained);
-  scene.add(clone);
-  addToLayoutData(clone);
+
+  if (isRoomObject(original)) {
+    clone.userData.roomId = original.userData.roomId;
+    clone.userData.type = original.userData.type;
+    clone.position.y = original.position.y;
+    scene.add(clone);
+    const room = roomsData.value.find(r => r._id === clone.userData.roomId || r.id === clone.userData.roomId);
+    if (room) {
+      room.wallsData.push({
+        id: clone.userData.id,
+        type: clone.userData.type,
+        position: { x: clone.position.x, y: clone.position.y, z: clone.position.z },
+        rotation: { x: clone.rotation.x, y: clone.rotation.y, z: clone.rotation.z },
+        scale: { x: clone.scale.x, y: clone.scale.y, z: clone.scale.z },
+        dimensions: clone.userData.dimensions || { width: 1, height: 1, depth: 1 },
+        texture: clone.userData.texture
+      });
+      updateRoom(projectId, clone.userData.roomId, room.wallsData);
+      uploadPreviewDebounced();
+    }
+  }
+  else {
+    const constrained = constrainPositionToFloors(clone.position, clone);
+    clone.position.copy(constrained);
+    scene.add(clone);
+    addToLayoutData(clone);
+  }
   selectedObjects[0] = clone;
   activeOutlinePass.selectedObjects = selectedObjects;
   updateSelectionUI(clone);
@@ -2094,6 +2343,7 @@ async function handleToolbarRotate(angleDeg) {
       const room = roomsData.value.find(r => r._id === roomId || r.id === roomId);
       if (room) {
         await updateRoom(projectId, roomId, room.wallsData);
+        uploadPreviewDebounced();
       }
     }
 
@@ -2118,6 +2368,7 @@ async function handleToolbarRotate(angleDeg) {
       const room = roomsData.value.find(r => r._id === roomId || r.id === roomId);
       if (room) {
         await updateRoom(projectId, roomId, room.wallsData);
+        uploadPreviewDebounced();
       }
 
       // ---> НОВО: Прерисуваме дупката с малко закъснение, ако сме завъртели прозорец/стена директно
@@ -2178,11 +2429,11 @@ async function handleFlip(axis) {
     const room = roomsData.value.find(r => r._id === roomId || r.id === roomId);
     if (room) {
       await updateRoom(projectId, roomId, room.wallsData);
+      uploadPreviewDebounced();
     }
   } else {
     saveLayoutDebounced();
   }
-
   updateSelectionUI(selectedObjects[0]);
 }
 
@@ -2198,7 +2449,8 @@ async function handleDelete(ceilingOnly = false) {
   if (isRoomObject(obj)) {
     // --- A: IT IS THE FLOOR (Delete Entire Room) ---
     if (obj.userData.type === 'floor') {
-      if (!confirm("Deleting the floor will remove the entire room. Continue?")) return;
+      const confirmed = await showConfirm("Сигурни ли сте, че искате да изтриете обекта?");
+      if (!confirmed) return;
 
       try {
         // 1. Call API to delete the whole room
@@ -2206,8 +2458,6 @@ async function handleDelete(ceilingOnly = false) {
 
         // 2. Update Local State: Remove the whole room object
         roomsData.value = roomsData.value.filter(r => r._id !== roomId || r.id !== roomId);
-
-        saveState();
 
         // 3. Scene Cleanup: Find ALL meshes (walls + floor) for this room and remove them
         const objectsToRemove = [];
@@ -2245,7 +2495,7 @@ async function handleDelete(ceilingOnly = false) {
         // 3. Call API: We are UPDATING the room, not deleting the room entity
         // Note: We use the immediate updateRoom, not the debounced one, for instant feedback
         updateRoomDebounced(projectId, roomId, updatedWallsData, currentRoom.hasCeiling);
-
+        uploadPreviewDebounced();
         // 4. Update Local State
         roomsData.value[roomIndex].wallsData = updatedWallsData;
         if (obj.userData.type === 'window') {
@@ -2255,7 +2505,6 @@ async function handleDelete(ceilingOnly = false) {
             redrawWallGeometry(roomsData, scene, parentWallId, roomId);
           }
         }
-        saveState();
         // 5. Scene Cleanup: Remove ONLY the selected wall mesh
         if (!ceilingOnly) {
           selectedObjects.forEach(mesh => {
@@ -2284,7 +2533,6 @@ async function handleDelete(ceilingOnly = false) {
     if (id) {
       layoutData.value = layoutData.value.filter(item => item.id !== id);
     }
-
     // 3. Save Layout
     saveLayoutDebounced();
   }
@@ -2333,47 +2581,32 @@ async function addDoorToWallCenter(doorData) {
     } catch (err) {
       console.error('Failed to load door', err);
       return;
-    }
-
-    // =========================================================
-    // НОВА ЛОГИКА ЗА ДВОЙНА ВРАТА (GROUP)
-    // =========================================================
-
-    // А) Създаваме контейнер (Група)
+    }  
     const doorGroup = new THREE.Group();
-
-    // Б) Подготвяме Копие 1 (Предна част)
     const sideA = deepCloneScene(gltf.scene);
     sideA.traverse(n => { if (n.isMesh) makeFinalMaterials(n); });
-
-    // В) Подготвяме Копие 2 (Задна част)
-    const sideB = deepCloneScene(gltf.scene); // Клонираме отново за второто копие
+    const sideB = deepCloneScene(gltf.scene);
     sideB.traverse(n => { if (n.isMesh) makeFinalMaterials(n); });
 
-    // Завъртаме втората врата на 180 градуса, за да сочи към другата стая
     const rawBox = new THREE.Box3().setFromObject(sideA);
     const rawSize = rawBox.getSize(new THREE.Vector3());
-
+    
     if (rawSize.x > 0 && rawSize.y > 0) {
       const scaleX = doorData.width / rawSize.x;
       const scaleY = doorData.height / rawSize.y;
-      const scaleZ = wall.userData.dimensions.depth / rawSize.z; // Дълбочина на вратата
+      
+      const scaleZ = wall.userData.dimensions.depth / rawSize.z; 
 
       sideA.scale.set(scaleX, scaleY, scaleZ);
-      sideB.scale.set(scaleX, scaleY, scaleZ * -1);
-    }
+      sideB.scale.set(scaleX, scaleY, scaleZ); 
 
-    // Д) Добавяме двете части в групата
+      sideB.rotation.y = Math.PI;
+    }
     doorGroup.add(sideA);
     doorGroup.add(sideB);
-
-    // =========================================================
-    // ПОЗИЦИОНИРАНЕ НА ГРУПАТА
-    // =========================================================
     const wallBox = new THREE.Box3().setFromObject(wall);
     const wallCenter = wallBox.getCenter(new THREE.Vector3());
-
-    // Групата отива в центъра на стената
+    // Групата се позиционира в центъра на стената
     doorGroup.position.set(wallCenter.x, getFloorLevelAt(wallCenter.x, wallCenter.z, doorGroup), wallCenter.z);
     doorGroup.rotation.copy(wall.rotation);
 
@@ -2397,21 +2630,15 @@ async function addDoorToWallCenter(doorData) {
     activeOutlinePass.selectedObjects = selectedObjects;
     updateSelectionUI(doorGroup);
 
-    // =========================================================
-    // ЗАПИС В БАЗАТА (Записваме само ГРУПАТА веднъж)
-    // =========================================================
     const room = roomsData.value.find(r => ((r._id && String(r._id) === String(roomId))) || (r.id && String(r.id) === String(roomId)));
 
-    if (room) {
-      // В базата записваме позицията на групата.
-      // Няма нужда да казваме на базата, че има 2 меша вътре. Това е визуален детайл.
+    if (room) { 
       const doorEntry = {
         id: newDoorId,
         type: 'door',
         wallId: targetWallId,
         roomId: roomId,
         filename: doorData.filename,
-        // Записваме мащаба на вътрешния обект (sideA), за да знаем колко да ги разпънем после
         scale: { x: sideA.scale.x, y: sideA.scale.y, z: sideA.scale.z },
         dimensions: { width: doorData.width, height: doorData.height, depth: wall.userData.dimensions.depth },
         position: { x: doorGroup.position.x, y: doorGroup.position.y, z: doorGroup.position.z },
@@ -2420,11 +2647,11 @@ async function addDoorToWallCenter(doorData) {
 
       if (!room.wallsData) room.wallsData = [];
       room.wallsData.push(doorEntry);
-      saveState();
 
       try {
         const apiRoomId = room.id || room._id;
         updateRoomDebounced(projectId, apiRoomId, room.wallsData);
+        uploadPreviewDebounced(projectId);
       } catch (e) {
         console.error("Error saving door:", e);
       }
@@ -2437,7 +2664,6 @@ async function addDoorToWallCenter(doorData) {
     isLoading.value = false;
   }
 }
-
 async function addWindowToWallCenter(WindowData) {
   isLoading.value = true;
   try {
@@ -2459,10 +2685,6 @@ async function addWindowToWallCenter(WindowData) {
       return;
     }
 
-    // =========================================================
-    // НОВА ЛОГИКА ЗА ДВОЙНА ВРАТА (GROUP)
-    // =========================================================
-
     // А) Създаваме контейнер (Група)
     const WindowGroup = new THREE.Group();
 
@@ -2470,17 +2692,27 @@ async function addWindowToWallCenter(WindowData) {
     const sideA = deepCloneScene(gltf.scene);
     sideA.traverse(n => { if (n.isMesh) makeFinalMaterials(n); });
 
+    // В) Подготвяме Копие 2 (Задна част)
+    const sideB = deepCloneScene(gltf.scene);
+    sideB.traverse(n => { if (n.isMesh) makeFinalMaterials(n); });
+
     const rawBox = new THREE.Box3().setFromObject(sideA);
     const rawSize = rawBox.getSize(new THREE.Vector3());
 
-    if (rawSize.x > 0 && rawSize.y > 0) {
-      const scaleX = WindowData.width / rawSize.x;
-      const scaleY = WindowData.height / rawSize.y;
-      const scaleZ = wall.userData.dimensions.depth * 2 / rawSize.z; // Дълбочина на вратата
+    const scaleX = WindowData.width / rawSize.x;
+    const scaleY = WindowData.height / rawSize.y;
+    const scaleZ = wall.userData.dimensions.depth * 2 / rawSize.z; // Дълбочина на прозореца
 
-      sideA.scale.set(scaleX, scaleY, scaleZ);
-    }
+    // Прилагаме мащаба на самите половини (както при вратите!)
+    sideA.scale.set(scaleX, scaleY, scaleZ);
+    sideB.scale.set(scaleX, scaleY, scaleZ);
+
+    // Завъртаме задната половина на 180 градуса
+    sideB.rotation.y = Math.PI;
+
+    // Добавяме ги в групата
     WindowGroup.add(sideA);
+    WindowGroup.add(sideB);
 
     // =========================================================
     // ПОЗИЦИОНИРАНЕ НА ГРУПАТА
@@ -2491,10 +2723,10 @@ async function addWindowToWallCenter(WindowData) {
     // Групата отива в центъра на стената
     WindowGroup.position.set(wallCenter.x, getFloorLevelAt(wallCenter.x, wallCenter.z, WindowGroup) + WindowData.heightFromFloor, wallCenter.z);
     WindowGroup.rotation.copy(wall.rotation);
-
-    // Metadata setup (Слагаме данните на ГРУПАТА, не на мешовете)
+    // ВАЖНО: Вече НЕ задаваме scale на самата група, защото го приложихме на децата (sideA и sideB)
+    
+    // Metadata setup
     const newWindowId = uuidv4();
-
     WindowGroup.name = "WindowGroup";
     WindowGroup.userData = {
       id: newWindowId,
@@ -2508,26 +2740,23 @@ async function addWindowToWallCenter(WindowData) {
 
     // UI Selection update
     selectedObjects.length = 0;
-    selectedObjects.push(WindowGroup); // Селектираме групата!
+    selectedObjects.push(WindowGroup);
     activeOutlinePass.selectedObjects = selectedObjects;
     updateSelectionUI(WindowGroup);
 
     // =========================================================
-    // ЗАПИС В БАЗАТА (Записваме само ГРУПАТА веднъж)
+    // ЗАПИС В БАЗАТА
     // =========================================================
     const room = roomsData.value.find(r => ((r._id && String(r._id) === String(roomId))) || (r.id && String(r.id) === String(roomId)));
 
     if (room) {
-      // В базата записваме позицията на групата.
-      // Няма нужда да казваме на базата, че има 2 меша вътре. Това е визуален детайл.
       const WindowEntry = {
         id: newWindowId,
         type: 'window',
         wallId: targetWallId,
         roomId: roomId,
         filename: WindowData.filename,
-        // Записваме мащаба на вътрешния обект (sideA), за да знаем колко да ги разпънем после
-        scale: { x: sideA.scale.x, y: sideA.scale.y, z: sideA.scale.z },
+        scale: { x: scaleX, y: scaleY, z: scaleZ },
         dimensions: { width: WindowData.width, height: WindowData.height, depth: wall.userData.dimensions.depth * 2 },
         position: { x: WindowGroup.position.x, y: WindowGroup.position.y, z: WindowGroup.position.z },
         rotation: { x: WindowGroup.rotation.x, y: WindowGroup.rotation.y, z: WindowGroup.rotation.z }
@@ -2535,16 +2764,20 @@ async function addWindowToWallCenter(WindowData) {
 
       if (!room.wallsData) room.wallsData = [];
       room.wallsData.push(WindowEntry);
+      
+      // Логиката за дупките си се вика и работи перфектно!
       redrawWallGeometry(roomsData, scene, targetWallId, roomId);
-      saveState();
+      
       try {
         const apiRoomId = room.id || room._id;
         updateRoomDebounced(projectId, apiRoomId, room.wallsData);
+        uploadPreviewDebounced(projectId);
       } catch (e) {
         console.error("Error saving window:", e);
       }
+      
       selectedObjects.length = 0;
-      selectedObjects.push(WindowGroup); // Селектираме групата!
+      selectedObjects.push(WindowGroup);
       activeOutlinePass.selectedObjects = selectedObjects;
       updateSelectionUI(WindowGroup);
     }
@@ -2589,19 +2822,15 @@ function switchTo2D() {
   activeCamera = orthoCamera;
   activeOutlinePass = outlinePass2D;
   bindControllerToCamera(activeCamera);
-  
-  controls.enableRotate = false; 
-  
-  controls.enablePan = true;     
+  controls.enableRotate = false;
+  controls.enablePan = true;
   controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
   controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN;
-
   controls.reset();
-  
+
   activeCamera.position.set(0, 20, 0);
   controls.target.set(0, 0, 0);
-  controls.update(); 
-
+  controls.update();
   renderPass.camera = activeCamera;
   composer.removePass(outlinePass3D);
   composer.addPass(outlinePass2D);
@@ -2611,13 +2840,13 @@ function switchTo3D() {
   activeCamera = perspectiveCamera;
   activeOutlinePass = outlinePass3D;
   bindControllerToCamera(activeCamera);
-  
+
   controls.enableRotate = true;
-  
-  controls.enablePan = true;     
-  controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE; 
-  controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;   
-  
+
+  controls.enablePan = true;
+  controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+  controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
+
   renderPass.camera = activeCamera;
   composer.removePass(outlinePass2D);
   composer.addPass(outlinePass3D);
@@ -2673,22 +2902,6 @@ onMounted(() => {
 
   setupLayout();
   emit('has-walls', roomsData.value.length > 0);
-  initHistory(roomsData, performRebuild);
-
-  // Слушане за Ctrl+Z / Ctrl+Y
-  window.addEventListener('keydown', (e) => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
-    if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-      e.preventDefault();
-      undo();
-    }
-
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))) {
-      e.preventDefault();
-      redo();
-    }
-  });
 });
 
 onBeforeUnmount(() => {
@@ -2703,8 +2916,7 @@ onBeforeUnmount(() => {
   if (controls) controls.dispose();
 });
 
-// EXPOSE createRoom so the parent can call it
-defineExpose({ startDragFromMenu, createRoom, addDoorToWallCenter, createWall, addWindowToWallCenter,takeRealisticScreenshot });
+defineExpose({ startDragFromMenu, createRoom, addDoorToWallCenter, createWall, addWindowToWallCenter, takeRealisticScreenshot });
 </script>
 
 <style scoped>
