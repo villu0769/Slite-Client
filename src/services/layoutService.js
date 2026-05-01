@@ -1,5 +1,6 @@
-import { getGLTFLoader } from '../services/gltfLoader'
+import { getGLTFLoader, setupMirrors } from '../services/gltfLoader'
 import { handleTextureChange,handleColorChange } from '../composables/textureManager'
+
 
 import * as THREE from 'three';
 const API_URL = "https://slite-api.onrender.com";
@@ -15,7 +16,7 @@ export const loadLayout = async (layoutData, manager, maxHeight, scene, perspect
         const modelUrl = item.filename;
 
         const gltf = await loader.loadAsync(modelUrl);
-
+        
         gltf.scene.position.x = item.position.x || 0;
         gltf.scene.position.y = item.position.y || 0;
         gltf.scene.position.z = item.position.z || 0;
@@ -47,6 +48,7 @@ export const loadLayout = async (layoutData, manager, maxHeight, scene, perspect
             await handleTextureChange(gltf.scene, item.texture);
           }
         }
+        if(modelUrl.includes('mirror')) setupMirrors(gltf.scene);
         scene.add(gltf.scene);
       } catch (err) {
         console.warn(`Грешка при зареждане на модела ${item.filename}:`, err);

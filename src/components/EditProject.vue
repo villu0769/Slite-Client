@@ -40,6 +40,7 @@ import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { GammaCorrectionShader } from 'three/addons/shaders/GammaCorrectionShader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { setupMirrors } from '../services/gltfLoader.js';
 import { v4 as uuidv4 } from 'uuid';
 import debounce from 'lodash.debounce';
 import { handleTextureChange, handleColorChange } from '../composables/textureManager.js';
@@ -1949,7 +1950,7 @@ function finalizeDropAt(posWorld) {
     // 3. Задаваме позицията: X и Z от constrain, Y от пода
     finalObject.position.set(constrained.x, floorY, constrained.z);
   }
-
+  if(draggedItem.filename.includes('mirror')) setupMirrors(finalObject);
   // ... останалата част от функцията си остава същата ...
   finalObject.name = draggedItem.name;
   finalObject.userData = { filename: draggedItem.filename }; // или както си го задал
