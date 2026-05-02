@@ -377,7 +377,7 @@ async function performRebuild() {
     scene.traverse((child) => {
       // Трием всичко, което е наше (стаи, стени, мебели, врати, resize handles)
       const userData = child.userData;
-      if (userData && (userData.roomId || userData.type === 'furniture' || userData.isResizeHandle || child.name === 'DoorGroup')) {
+      if (userData && (userData.roomId || userData.type === 'furniture' || userData.isResizeHandle || child.type === 'door')) {
         objectsToRemove.push(child);
       }
     });
@@ -2614,7 +2614,7 @@ async function addDoorToWallCenter(doorData) {
     // Metadata setup (Слагаме данните на ГРУПАТА, не на мешовете)
     const newDoorId = uuidv4();
 
-    doorGroup.name = "DoorGroup";
+    doorGroup.name = "Врата";
     doorGroup.userData = {
       id: newDoorId,
       filename: doorData.filename,
@@ -2728,7 +2728,7 @@ async function addWindowToWallCenter(WindowData) {
     
     // Metadata setup
     const newWindowId = uuidv4();
-    WindowGroup.name = "WindowGroup";
+    WindowGroup.name = "Прозорец";
     WindowGroup.userData = {
       id: newWindowId,
       filename: WindowData.filename,
