@@ -756,7 +756,6 @@ function onPointerDownForDrag(e) {
   // =========================================================
   const hit = firstIntersectableObjectFromPointer(e.clientX, e.clientY);
 
-  // Ако не сме уцелили нищо -> чистим селекцията
   if (!hit) {
     clearSelection();
     return;
@@ -765,23 +764,20 @@ function onPointerDownForDrag(e) {
   const rawPicked = hit.object;
   const root = findRootForSelection(rawPicked);
 
-  // Логика за Floor / Room selection
-  if (root.userData && root.userData.type === 'floor') {
-    const roomId = root.userData.roomId;
-    selectedObjects.length = 0;
-    scene.traverse((child) => {
-      if (child.userData && child.userData.roomId === roomId) {
-        selectedObjects.push(child);
-      }
-    });
-    dragObject = root;
-  }
-  else if (root.userData && root.userData.type === 'wall') {
-    if (selectedObjects[0] !== root) {
+  const isAlreadySelected = selectedObjects.includes(root);
+  if (!isAlreadySelected) {
+    // 1. Ако НЕ е бил селектиран, само го селектираме
+    if (root.userData && root.userData.type === 'floor') {
+      const roomId = root.userData.roomId;
+      selectedObjects.length = 0;
+      scene.traverse((child) => {
+        if (child.userData && child.userData.roomId === roomId) {
+          selectedObjects.push(child);
+        }
+      });
+    } else if (root.userData && root.userData.type === 'wall') {
       selectedObjects.length = 0;
       selectedObjects.push(root);
-
-      // Намираме всички обекти, закачени за тази стена
       const wallId = root.userData.id;
       if (wallId) {
         scene.traverse((child) => {
@@ -790,54 +786,45 @@ function onPointerDownForDrag(e) {
           }
         });
       }
-    }
-    dragObject = root;
-  }
-  else {
-    // Multi-selection logic: запазваме групата, ако кликнем върху вече селектиран
-    if (selectedObjects[0] !== root) {
+    } else {
       selectedObjects.length = 0;
       selectedObjects.push(root);
     }
-    dragObject = root;
-    if (dragObject && dragObject.userData.type === 'window') {
-      originalWallId = dragObject.userData.wallId; // Запомняме от коя стена тръгва!
-      originalRoomId = dragObject.userData.roomId; // Запомняме от коя стая тръгва!
+
+    // 2. Обновяваме UI
+    activeOutlinePass.selectedObjects = selectedObjects.filter(obj => !obj.userData.isResizeHandle);
+    updateSelectionUI(root);
+    if (typeof updateHandlePositions === 'function') {
+      updateHandlePositions(root);
     }
+
+    //тук само се избира обекта, без да се мести
+    dragging = false; 
+    return; 
   }
 
-  // Grid check
-  if (root.name === 'floor-grid' && !root.userData.roomId) {
-    clearSelection();
-    return;
+  //стигаме дотук само ако обектът вече е селектиран, тоест ще го местим
+  dragObject = root;
+
+  if (dragObject && dragObject.userData.type === 'window') {
+    originalWallId = dragObject.userData.wallId;
+    originalRoomId = dragObject.userData.roomId;
   }
 
-  // Start Dragging
   dragging = true;
   controls.enabled = false;
 
   const objWorldPos = new THREE.Vector3();
   dragObject.getWorldPosition(objWorldPos);
 
-  // Нагласяме равнината за Drag
   dragPlane.setFromNormalAndCoplanarPoint(DRAG_PLANE_NORMAL || new THREE.Vector3(0, 1, 0), objWorldPos);
 
-  // Изчисляваме Drag Offset
   const intersectionPoint = new THREE.Vector3();
   if (raycaster.ray.intersectPlane(dragPlane, intersectionPoint)) {
     dragOffset.copy(objWorldPos).sub(intersectionPoint);
   } else {
-    dragging = false; // Fail-safe
+    dragging = false;
     return;
-  }
-
-  // UI Updates (скриваме хендълите по време на влачене, ако искаш)
-  activeOutlinePass.selectedObjects = selectedObjects.filter(obj => !obj.userData.isResizeHandle);
-  updateSelectionUI(dragObject);
-
-  // Ако имаш функция за показване на хендъли:
-  if (typeof updateHandlePositions === 'function') {
-    updateHandlePositions(dragObject);
   }
 
   e.preventDefault();
